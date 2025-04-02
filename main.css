@@ -1,0 +1,856 @@
+@keyframes spin {
+    0% {
+        transform: rotate(0deg);
+    }
+
+    100% {
+        transform: rotate(360deg);
+    }
+}
+
+@keyframes fadein {
+    from {
+        opacity: 0 !important;
+        transform: translateY(-15px);
+    }
+
+    to {
+        opacity: 1 !important;
+        transform: translateY(0);
+    }
+}
+
+@keyframes fadeout {
+    from {
+        opacity: 1;
+    }
+
+    to {
+        opacity: 0;
+    }
+}
+
+#translationContainer {
+    position: fixed !important;
+    bottom: 20px !important;
+    right: 20px !important;
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    gap: 8px !important;
+    z-index: 10000000 !important;
+    transition: transform 0.3s ease-in-out !important;
+    transform-origin: right !important;
+}
+
+#translationContainer.hidden {
+    transform: translateX(68%);
+}
+
+/* Box principale di feedback */
+#translationFeedbackBox {
+    background: linear-gradient(135deg, rgba(44, 62, 80, 0.95), rgba(52, 73, 94, 0.85)) !important;
+    color: #fff !important;
+    padding: 16px 24px !important;
+    border-radius: 10px !important;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif !important;
+    font-size: 16px !important;
+    display: flex !important;
+    max-width: 90vw !important;
+    align-items: center !important;
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.35) !important;
+    backdrop-filter: blur(6px) !important;
+    /*transition: all 0.3s ease-in-out !important;*/
+    transition: transform 0.3s ease-in-out !important;
+    transform-origin: right !important;
+}
+
+.immTransl-arrow {
+    width: 24px;
+    height: 24px;
+    cursor: pointer;
+    transition: transform 0.3s ease;
+    margin-right: 12px;
+    align-items: center;
+    display: flex;
+}
+
+#translationContainer.hidden .immTransl-arrow {
+    transform: rotate(180deg);
+}
+
+#translationFeedbackBox .spinner {
+    width: 24px !important;
+    height: 24px !important;
+    border: 3px solid #fff !important;
+    border-top: 3px solid transparent !important;
+    border-radius: 50% !important;
+    margin-right: 12px !important;
+    animation: spin 1s linear infinite;
+}
+
+/* Container per le notifiche */
+#notificationContainer {
+    position: fixed !important;
+    bottom: 90px !important;
+    right: 20px !important;
+    z-index: 11000 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 10px !important;
+    max-width: 90vw !important;
+}
+
+/* Stile per i box di notifica */
+.notification {
+    padding: 12px 20px !important;
+    border-radius: 8px !important;
+    color: #fff !important;
+    font-family: Arial, sans-serif !important;
+    font-size: 16px !important;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2) !important;
+    animation: fadein 0.5s ease-out !important;
+}
+
+.notification.error {
+    background-color: #e74c3c !important;
+    /* Rosso per errori gravi */
+}
+
+.notification.warning {
+    background-color: #f1c40f !important;
+    /* Giallo per avvisi */
+    color: #000 !important;
+}
+
+.notification.success {
+    background-color: #2ecc71 !important;
+    /* Verde per successi */
+    color: #000 !important;
+}
+
+.notification.info {
+    background-color: #3498db !important;
+    /* Blu per informazioni */
+    color: #fff !important;
+}
+
+.fade-out {
+    animation: fadeout 0.5s forwards !important;
+}
+
+/* Regole responsive per dispositivi mobili */
+@media (max-width: 600px) {
+
+    #translationFeedbackBox,
+    .notification {
+        font-size: 14px !important;
+        padding: 10px 16px !important;
+    }
+
+    #translationFeedbackBox .spinner {
+        width: 16px !important;
+        height: 16px !important;
+        margin-right: 8px !important;
+    }
+}
+
+/* Container per i pulsanti di controllo */
+#translationControls {
+    margin-left: 12px !important;
+    display: flex !important;
+    gap: 8px !important;
+}
+
+.immTransl-control-btn {
+    width: 36px !important;
+    height: 36px !important;
+    border: none !important;
+    border-radius: 50% !important;
+    cursor: pointer !important;
+    outline: none !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    color: #fff !important;
+    font-size: 14px !important;
+    transition: background-color 0.2s ease, transform 0.1s ease !important;
+}
+
+.immTransl-control-btn:hover {
+    filter: brightness(1.2) !important;
+}
+
+.immTransl-control-btn:active {
+    transform: scale(0.95) !important;
+}
+
+.immTransl-control-btn.pause {
+    background-color: #f1c40f !important;
+}
+
+.immTransl-control-btn.resume {
+    background-color: #2ecc71 !important;
+}
+
+.immTransl-control-btn.cancel {
+    background-color: #e74c3c !important;
+}
+
+.immTransl-control-btn.reset {
+    background: linear-gradient(135deg, rgba(44, 62, 80, 0.95), rgba(52, 73, 94, 0.85)) !important;
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.35) !important;
+    backdrop-filter: blur(6px) !important;
+    transition: background-color 0.3s ease, transform 0.1s ease !important;
+    width: 48px !important;
+    height: 48px !important;
+}
+
+.immTransl-control-btn:disabled {
+    opacity: 0.5 !important;
+    cursor: not-allowed !important;
+}
+
+@media (max-width: 600px) {
+
+    #translationFeedbackBox,
+    .notification {
+        font-size: 14px !important;
+        padding: 10px 16px !important;
+    }
+
+    #translationFeedbackBox .spinner {
+        width: 16px !important;
+        height: 16px !important;
+        margin-right: 8px !important;
+    }
+}
+
+.translation-wrapper {
+    position: relative;
+    align-items: center;
+}
+
+.text-spinner {
+    display: inline-block;
+    width: 1em;
+    height: 1em;
+    border: 3px solid rgba(0, 0, 0, 0.604);
+    border-top: 3px solid transparent;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin-left: 5px;
+    flex: 0 0 auto;
+}
+
+.text-retry-button {
+    width: 1em;
+    height: 1em;
+    background-color: #e53935;
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    padding: 10px;
+
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 500;
+    text-transform: uppercase;
+    cursor: pointer;
+    outline: none;
+    box-shadow: 0px 3px 1px -2px rgba(0, 0, 0, 0.2),
+        0px 2px 2px 0px rgba(0, 0, 0, 0.14),
+        0px 1px 5px 0px rgba(0, 0, 0, 0.12);
+    transition: box-shadow 0.3s ease, background-color 0.3s ease;
+    position: absolute;
+    cursor: pointer;
+    z-index: 1000;
+}
+
+.text-retry-button:hover {
+    background-color: #d32f2f;
+    box-shadow: 0px 5px 5px -3px rgba(0, 0, 0, 0.2),
+        0px 8px 10px 1px rgba(0, 0, 0, 0.14),
+        0px 3px 14px 2px rgba(0, 0, 0, 0.12);
+}
+
+.text-retry-button:active {
+    background-color: #c62828;
+    box-shadow: 0px 2px 4px -1px rgba(0, 0, 0, 0.2),
+        0px 4px 5px 0px rgba(0, 0, 0, 0.14),
+        0px 1px 10px 0px rgba(0, 0, 0, 0.12);
+}
+
+.text-retry-button::after {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: transparent;
+    z-index: 9999;
+}
+
+.ocr-overlay {
+    position: absolute !important;
+    color: #fff !important;
+    font-family: 'Helvetica Neue', Arial, sans-serif !important;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6) !important;
+    padding: 4px 8px !important;
+    border-radius: 0px !important;
+    display: flex;
+    align-items: center !important;
+    justify-content: center !important;
+    z-index: 9999 !important;
+    transition: opacity 0.3s ease !important;
+    opacity: 0.95 !important;
+    overflow: hidden !important;
+    white-space: pre-wrap !important;
+}
+
+.ocr-box {
+    position: absolute !important;
+    background: linear-gradient(135deg, rgba(44, 62, 80, 0.95), rgba(52, 73, 94, 0.85));
+    box-shadow: 8px 8px 11px rgba(0, 0, 0, 0.1), 0 1px 2px rgba(0, 0, 0, 0.1) !important;
+    color: rgb(255, 255, 255);
+    font-weight: 400 !important;
+    display: flex;
+    justify-content: center !important;
+    align-items: center !important;
+    flex-direction: column !important;
+    -webkit-overflow-scrolling: touch;
+    -webkit-backdrop-filter: blur(40px) !important;
+    -webkit-hyphens: auto !important;
+    line-height: 1.2em !important;
+    box-sizing: border-box !important;
+    word-break: break-word !important;
+    word-wrap: break-word !important;
+    letter-spacing: normal !important;
+    border-radius: 8px !important;
+    /*font-size: clamp(2px, 1vw, 10px) !important;*/
+    font-family: 'Helvetica Neue', Arial, sans-serif !important;
+    text-align: left !important;
+    padding: 2px 4px !important;
+    overflow: auto !important;
+    white-space: normal !important;
+    /*pointer-events: none !important;*/
+    z-index: 9999 !important;
+
+    /*
+    container-type: size;
+    resize: both;*/
+}
+
+.ocr-box-text {
+    font-size: 100%;
+}
+
+.ocr-box-text::-webkit-scrollbar {
+    -webkit-appearance: none;
+    width: 0;
+    height: 0;
+}
+
+.ocr-box::-webkit-scrollbar {
+    -webkit-appearance: none;
+    width: 0;
+    height: 0;
+}
+
+.ocr-box.dragging {
+    touch-action: none;
+    -webkit-touch-callout: none;
+    /* previene menu contestuale su iOS */
+    -webkit-user-select: none;
+    user-select: none;
+}
+
+#pdf-container.dragging {
+    touch-action: none;
+    -webkit-touch-callout: none;
+    /* previene menu contestuale su iOS */
+    -webkit-user-select: none;
+}
+
+.ocr-box.ocr-box-error {
+    background: linear-gradient(135deg, #f8e1e1, #fdf5f5);
+    color: #a94442;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.05);
+    border-radius: 8px;
+    padding: 0;
+    overflow: hidden;
+}
+
+.ocr-box.ocr-box-error:hover {
+    transform: scale(1.02);
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+}
+
+.ocr-box .spinner {
+    display: inline-block;
+    width: auto;
+    height: 1em;
+    aspect-ratio: 1;
+    border: 3px solid rgba(255, 255, 255, 0.1) !important;
+    border-top: 3px solid transparent !important;
+    border-radius: 50% !important;
+    margin: auto !important;
+    animation: spin 1s linear infinite;
+}
+
+.ocr-box.ocr-box-error .ocr-retry-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    width: 100%;
+    height: 100%;
+    background: #f44336;
+    color: #fff;
+    font-size: clamp(6px, 5vw, 24px);
+    font-weight: 500;
+    border: none;
+    outline: none;
+    border-radius: 4px;
+    cursor: pointer;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    position: relative;
+    overflow: hidden;
+    transition: background 0.3s, box-shadow 0.3s;
+}
+
+.ocr-box.ocr-box-error .ocr-retry-btn:hover {
+    background: #e53935;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+}
+
+.ocr-box.ocr-box-error .ocr-retry-btn:active {
+    background: #d32f2f;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.ocr-box.ocr-box-error .ocr-retry-btn::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 5px;
+    height: 5px;
+    background: rgba(255, 255, 255, 0.5);
+    opacity: 0;
+    border-radius: 50%;
+    transform: translate(-50%, -50%) scale(1);
+    transition: width 0.6s ease-out, height 0.6s ease-out, opacity 0.6s ease-out;
+}
+
+.ocr-box.ocr-box-error .ocr-retry-btn:active::after {
+    width: 120%;
+    height: 120%;
+    opacity: 0;
+    transition: 0s;
+}
+
+.img-container {
+    position: relative !important;
+    display: inline-block !important;
+}
+
+#pdf-viewer {
+    position: relative;
+    width: auto;
+    height: 95%;
+    /*background: #f5f5f5;*/
+    display: flex;
+    /*box-shadow: 0 10px 18px rgba(0, 0, 0, 0.2);*/
+    /*flex-direction: column;*/
+    /*overflow: hidden; For ocr-container shadows*/
+}
+
+#pdf-toolbar {
+    position: fixed;
+    top: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 90%;
+    max-width: 600px;
+    height: 55px;
+    background: rgba(44, 62, 80, 0.7);
+    backdrop-filter: blur(10px);
+    border-radius: 12px;
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    z-index: 1000000;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    padding: 0 15px;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+#pdf-toolbar button {
+    background: rgba(255, 255, 255, 0.2);
+    border: none;
+    color: #fff;
+    padding: 10px;
+    margin: 0 5px;
+    border-radius: 8px;
+    font-size: 18px;
+    cursor: pointer;
+    transition: all 0.3s ease-in-out;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 42px;
+    height: 42px;
+}
+
+#pdf-toolbar button:hover {
+    background: rgba(255, 255, 255, 0.4);
+}
+
+#pdf-toolbar button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+
+#pdf-toolbar button i {
+    font-size: 22px;
+}
+
+#pdf-toolbar span {
+    font-size: 18px;
+    font-weight: bold;
+    text-align: center;
+    flex-grow: 1;
+    padding: 0 10px;
+}
+
+.PDFtextLayer span {
+    position: absolute !important;
+}
+
+.PDFtextLayer {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+}
+
+#pdf-container {
+    margin-top: 80px;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    overflow: visible;
+    /* For shadows in ocr-container
+    overflow-x: hidden;
+    overflow-y: auto;*/
+    position: relative;
+    /*background: #fff;
+    padding: 10px;
+    border: 2px solid #ddd;
+    border-radius: 6px;*/
+    margin: auto;
+    width: 95%;
+    /* Rimuovi o aumenta il max-width se necessario */
+    /* max-width: 1000px; */
+}
+
+#pdf-container .ocr-container {
+    position: relative;
+    width: 100%;
+    /*margin-bottom: 20px;*/
+    box-shadow: 0px 0px 6px rgba(0, 0, 0, 0.2);
+    overflow: hidden;
+}
+
+#pdf-container canvas {
+    width: 100% !important;
+    height: auto !important;
+    display: block;
+}
+
+
+/* Overlay con fade-in */
+#pdfOptionsOverlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10000;
+    padding: 20px;
+    animation: fadeIn 0.3s ease-in-out;
+}
+
+/* Animazione fade in overlay */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
+    }
+}
+
+/* Modal container con slide-up */
+#pdfOptionsModal {
+    background: #f5f5f5;
+    border-radius: 8px;
+    padding: 20px;
+    width: 100%;
+    max-width: 400px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    font-family: Arial, sans-serif;
+    opacity: 0;
+    transform: translateY(20px);
+    animation: slideUp 0.4s forwards;
+}
+
+@keyframes slideUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Titolo */
+#pdfOptionsModal h2 {
+    margin-top: 0;
+    font-size: 20px;
+    color: #333;
+    text-align: center;
+    margin-bottom: 20px;
+}
+
+/* Elementi del form */
+#pdfOptionsModal form>div {
+    margin-bottom: 15px;
+}
+
+#pdfOptionsModal label {
+    color: #333;
+    font-size: 14px;
+    margin-left: 8px;
+}
+
+/* Input text e number con margini e focus animato */
+#pdfOptionsModal input[type="text"],
+#pdfOptionsModal input[type="number"] {
+    width: calc(100% - 20px);
+    padding: 10px;
+    margin-top: 8px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-size: 14px;
+    transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+#pdfOptionsModal input[type="text"]:focus,
+#pdfOptionsModal input[type="number"]:focus {
+    outline: none;
+    border-color: #333;
+    box-shadow: 0 0 5px rgba(51, 51, 51, 0.3);
+}
+
+/* Radio button leggermente ingranditi */
+#pdfOptionsModal input[type="radio"] {
+    transform: scale(1.2);
+    vertical-align: middle;
+    margin-right: 8px;
+}
+
+/* Contenitore per lo slider e il valore percentuale */
+#pdfOptionsModal .quality-container {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+}
+
+#pdfOptionsModal .quality-container label {
+    font-size: 14px;
+    color: #333;
+}
+
+#pdfOptionsModal .quality-container input[type="range"] {
+    flex: 1;
+    margin: 0;
+}
+
+#pdfOptionsModal .quality-container span {
+    width: 40px;
+    text-align: center;
+    font-size: 14px;
+    color: #333;
+}
+
+#pdfOptionsModal input[type="range"] {
+    -webkit-appearance: none;
+    width: 100%;
+    height: 6px;
+    border-radius: 3px;
+    background: #ddd;
+    outline: none;
+    transition: background 0.3s;
+}
+
+/* Track dello slider per Webkit */
+#pdfOptionsModal input[type="range"]::-webkit-slider-runnable-track {
+    width: 100%;
+    height: 6px;
+    cursor: pointer;
+    background: #ddd;
+    border-radius: 3px;
+}
+
+/* Thumb dello slider per Webkit */
+#pdfOptionsModal input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: #333;
+    cursor: pointer;
+    transition: background 0.3s, transform 0.2s;
+    margin-top: -7px;
+    /* centratura verticale rispetto alla track */
+}
+
+/* Hover sul thumb per Webkit */
+#pdfOptionsModal input[type="range"]::-webkit-slider-thumb:hover {
+    background: #555;
+    transform: scale(1.1);
+}
+
+@media (max-width: 480px) {
+    #pdfOptionsModal .quality-container {
+        flex-direction: column;
+        align-items: center;
+    }
+
+    #pdfOptionsModal .quality-container input[type="range"] {
+        width: 100%;
+        margin: 8px 0;
+    }
+
+    #pdfOptionsModal .quality-container span {
+        text-align: center;
+    }
+}
+
+/* Gruppo dei bottoni con spacing e animazioni */
+#pdfOptionsModal .button-group {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 20px;
+}
+
+#pdfOptionsModal button {
+    padding: 10px 18px;
+    font-size: 14px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background-color 0.3s ease, transform 0.2s ease;
+}
+
+#pdfOptionsModal button#cancelPdfOptions {
+    background: #ccc;
+    color: #fff;
+}
+
+#pdfOptionsModal button#cancelPdfOptions:hover {
+    background: #b3b3b3;
+    transform: scale(1.02);
+}
+
+#pdfOptionsModal button#confirmPdfOptions {
+    background: #333;
+    color: #fff;
+}
+
+#pdfOptionsModal button#confirmPdfOptions:hover {
+    background: #1a1a1a;
+    transform: scale(1.02);
+}
+
+/* Responsive: per dispositivi con schermo ridotto */
+@media (max-width: 480px) {
+    #pdfOptionsModal {
+        padding: 15px;
+        max-width: 90%;
+    }
+
+    #pdfOptionsModal h2 {
+        font-size: 18px;
+    }
+
+    #pdfOptionsModal button {
+        padding: 10px;
+        font-size: 16px;
+    }
+
+    #pdfOptionsModal button#confirmPdfOptions {
+        flex: auto;
+    }
+}
+
+
+@media (max-width: 600px) {
+    #pdf-toolbar {
+        width: 95%;
+        max-width: 95%;
+        height: 60px;
+        padding: 0 10px;
+    }
+
+    #pdf-toolbar button {
+        width: 44px;
+        height: 44px;
+    }
+
+    #pdf-toolbar button i {
+        font-size: 20px;
+    }
+
+    #pdf-toolbar span {
+        font-size: 16px;
+    }
+
+    #pdf-viewer {
+        margin-top: 90px;
+    }
+
+    #pdf-toolbar #pageIndicator,
+    #pdf-toolbar #zoomIndicator {
+        font-size: 14px;
+    }
+}
+
+@media (max-width: 480px) {
+    .ocr-box {
+        padding: 1px 2px !important;
+        border-radius: 4px !important;
+    }
+
+    .ocr-overlay {
+        padding: 2px 4px !important;
+    }
+}
