@@ -343,6 +343,8 @@
                 processQueue(translatorInstance.callDelay);
             }
         };
+
+        self.postMessage({ type: 'ready' });
     };
 
     // Fallback worker dybamic creation for JS Injection (bypassing CSP)
@@ -355,4 +357,15 @@
     namespace.immTrans = namespace.immTrans || {};
     namespace.immTrans.worker = new Worker(blobUrl);
     namespace.immTrans.workerCore = workerCore;
+
+
+    namespace.immTrans.ready = new Promise((resolve) => {
+        function handle(e) {
+            if (e.data?.type === 'ready') {
+              namespace.immTrans.worker.removeEventListener('message', handle);
+              resolve();                
+            }
+          }
+          namespace.immTrans.worker.addEventListener('message', handle);
+    });
 })();
