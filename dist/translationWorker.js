@@ -85,7 +85,7 @@
                 } catch (err) {
                     if (retries > 0) {
                         console.error(`Fetch error: ${err.message}. Retrying in ${delay} ms...`);
-                        await ImmUtils.sleep(delay);
+                        await setTimeout(() => {}, delay);
                         return await this.fetchWithRetry(url, options, retries - 1, delay * 2);
                     } else {
                         console.error("Max retries reached.", err);
