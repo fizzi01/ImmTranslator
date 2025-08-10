@@ -3,10 +3,10 @@
     const hasNativeUUID = "function" == typeof crypto.randomUUID;
     class ImmUtils {
         static uuidv4_fallback() {
-            return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c => {
+            return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, c => {
                 const r = 15 & crypto.getRandomValues(new Uint8Array(1))[0];
                 return ("x" === c ? r : 3 & r | 8).toString(16);
-            }));
+            });
         }
         static generateUUID() {
             return hasNativeUUID ? crypto.randomUUID() : ImmUtils.uuidv4_fallback();
@@ -24,10 +24,10 @@
             translationActive = isActive;
         }
         static sleep(ms) {
-            return new Promise((resolve => setTimeout(resolve, ms)));
+            return new Promise(resolve => setTimeout(resolve, ms));
         }
         static yieldControl() {
-            return new Promise((resolve => requestAnimationFrame(resolve)));
+            return new Promise(resolve => requestAnimationFrame(resolve));
         }
         static decodeHTMLEntities(text) {
             return (new DOMParser).parseFromString(text, "text/html").documentElement.textContent;
@@ -76,9 +76,9 @@
         static observeCanvasResize(canvas) {
             window._canvasObservers || (window._canvasObservers = new WeakMap), window._canvasObservers.has(canvas) && window._canvasObservers.get(canvas).disconnect(), 
             canvas._observerPaused = !1;
-            const resizeObserver = new ResizeObserver((() => {
+            const resizeObserver = new ResizeObserver(() => {
                 canvas._observerPaused || OCRStrategy.updateOverlay(canvas);
-            }));
+            });
             resizeObserver.observe(canvas), window._canvasObservers.set(canvas, resizeObserver);
         }
         static pauseCanvasObserver(canvas) {
@@ -87,9 +87,9 @@
         }
         static resumeCanvasObserver(canvas) {
             if (window._canvasObservers && window._canvasObservers.has(canvas)) {
-                return window._canvasObservers.get(canvas).observe(canvas), setTimeout((() => {
+                return window._canvasObservers.get(canvas).observe(canvas), setTimeout(() => {
                     canvas._observerPaused = !1;
-                }), 50), !0;
+                }, 50), !0;
             }
             return !1;
         }
@@ -97,14 +97,14 @@
             if (translationActive) {
                 pdfOCR || ImmUtils.storeTranslationNodes(), feedbackCallback("Reset", !1);
                 for (const entry of originalTextNodes) entry.node.nodeValue = entry.text;
-                document.querySelectorAll(".ocr-box").forEach((box => {
+                document.querySelectorAll(".ocr-box").forEach(box => {
                     box.style.display = "none";
-                })), notificationCallback("Translation Reset", "success"), translationActive = !1;
+                }), notificationCallback("Translation Reset", "success"), translationActive = !1;
             } else {
                 for (const entry of trTextNodes) entry.text && (entry.node.nodeValue = entry.text);
-                document.querySelectorAll(".ocr-box").forEach((box => {
+                document.querySelectorAll(".ocr-box").forEach(box => {
                     box.style.display = "flex", OCRStrategy.adjustFontSize(box);
-                })), notificationCallback("Translation Restored", "success"), translationActive = !0;
+                }), notificationCallback("Translation Restored", "success"), translationActive = !0;
             }
         }
     }
@@ -156,7 +156,7 @@
             offscreen.style.opacity = "0", document.body.appendChild(offscreen), offscreen.appendChild(clone);
             const rect = box.getBoundingClientRect();
             clone.style.writingMode = "horizontal-tb", clone.style.transform = "none", clone.style.width = rect.height + "px", 
-            clone.style.height = rect.width + "px", await new Promise((resolve => requestAnimationFrame(resolve)));
+            clone.style.height = rect.width + "px", await new Promise(resolve => requestAnimationFrame(resolve));
             const dataUrl = (await html2canvas(clone, {
                 scale: 2,
                 backgroundColor: null
@@ -192,7 +192,7 @@
                 let pagesToProcess = [];
                 if ("all" === options.type) pagesToProcess = Array.from({
                     length: containers.length
-                }, ((_, i) => i)); else if ("specific" === options.type) pagesToProcess = options.pages.map((p => p - 1)).filter((i => i >= 0 && i < containers.length)); else if ("range" === options.type) {
+                }, (_, i) => i); else if ("specific" === options.type) pagesToProcess = options.pages.map(p => p - 1).filter(i => i >= 0 && i < containers.length); else if ("range" === options.type) {
                     const start = options.range.start - 1, end = options.range.end - 1;
                     pagesToProcess = [];
                     for (let i = start; i <= end && i < containers.length; i++) pagesToProcess.push(i);
@@ -202,7 +202,7 @@
                     let tCanvas = container.querySelector("canvas[data-ocr-processed='true']");
                     tCanvas && OCRStrategy.updateOverlay(tCanvas), tCanvas || (tCanvas = container.querySelector("canvas"));
                     const iPageWidth = tCanvas?.offsetWidth || pageWidth, iPageHeight = tCanvas?.offsetHeight || pageHeight, iOrientation = pageWidth > pageHeight ? "landscape" : "portrait", backupStyles = [], verticalBoxes = [];
-                    container.querySelectorAll(".ocr-box").forEach(((box, idx) => {
+                    container.querySelectorAll(".ocr-box").forEach((box, idx) => {
                         const computed = getComputedStyle(box);
                         backupStyles[idx] = {
                             background: computed.background,
@@ -218,7 +218,7 @@
                         box.style.writingMode = computed.writingMode, box.offsetWidth, ("vertical-rl" === computed.writingMode || computed.transform && ("matrix(0, 1, -1, 0, 0, 0)" === computed.transform || "matrix(0, -1, 1, 0, 0, 0)" === computed.transform || computed.transform.includes("rotate(90") || computed.transform.includes("rotate(-90") || computed.transform.includes("rotate(270"))) && verticalBoxes.push(box);
                         const resizeHandles = box.querySelectorAll("[class^='resize-handle']");
                         for (const handle of resizeHandles) handle.style.display = "none";
-                    }));
+                    });
                     const tempImages = [];
                     for (const box of verticalBoxes) {
                         const {dataUrl: dataUrl, cloneWidth: cloneWidth, cloneHeight: cloneHeight} = await PdfExporterFacade.processVerticalBox(box), computed = getComputedStyle(box), left = parseFloat(computed.left) + cloneHeight, top = parseFloat(computed.top), img = new Image;
@@ -248,7 +248,7 @@
                         windowWidth: iPageWidth,
                         windowHeight: iPageHeight
                     })).toDataURL("image/jpeg", options.quality);
-                    bgImg.remove(), container.querySelectorAll(".ocr-box").forEach(((box, idx) => {
+                    bgImg.remove(), container.querySelectorAll(".ocr-box").forEach((box, idx) => {
                         const backup = backupStyles[idx];
                         if (!backup) return;
                         box.style.background = backup.background, box.style.backgroundColor = backup.backgroundColor, 
@@ -256,11 +256,11 @@
                         box.style.maxHeight = backup.maxHeight, box.style.padding = backup.padding;
                         const resizeHandles = box.querySelectorAll("[class^='resize-handle']");
                         for (const handle of resizeHandles) handle.style.display = "";
-                    }));
+                    });
                     for (const {box: box, img: img} of tempImages) box.style.display = "", img.remove();
                     index > 0 && (pdf.addPage([ iPageWidth, iPageHeight ], iOrientation), pdf.internal.pageSize.width = iPageWidth, 
                     pdf.internal.pageSize.height = iPageHeight, pdf.internal.pageSize.orientation = iOrientation), 
-                    pdf.addImage(imgData, "JPEG", 0, 0, iPageWidth, iPageHeight), await new Promise((resolve => setTimeout(resolve, 500)));
+                    pdf.addImage(imgData, "JPEG", 0, 0, iPageWidth, iPageHeight), await new Promise(resolve => setTimeout(resolve, 500));
                 }
                 pdfViewer.style.transform = "scale(" + currentZoomFactor + ")", zoomInButton && (zoomInButton.disabled = !1), 
                 zoomOutButton && (zoomOutButton.disabled = !1), logFunction("PDF Ready ✅", "success");
@@ -300,9 +300,9 @@
         static restoreImageOverlay() {
             try {
                 const container = document.getElementById("imageContainer"), overlayImg = document.getElementById("overlayCanvasImage");
-                overlayImg && overlayImg.remove(), container.querySelectorAll(".ocr-box").forEach((box => {
+                overlayImg && overlayImg.remove(), container.querySelectorAll(".ocr-box").forEach(box => {
                     box.style.display = "";
-                }));
+                });
                 const pdfButton = document.getElementById("downloadPdf");
                 pdfButton && (pdfButton.disabled = !1);
             } catch (err) {}
@@ -313,7 +313,7 @@
             offscreen.style.opacity = "0", document.body.appendChild(offscreen), offscreen.appendChild(clone);
             const rect = box.getBoundingClientRect();
             clone.style.writingMode = "horizontal-tb", clone.style.transform = "none", clone.style.width = rect.height + "px", 
-            clone.style.height = rect.width + "px", await new Promise((resolve => requestAnimationFrame(resolve)));
+            clone.style.height = rect.width + "px", await new Promise(resolve => requestAnimationFrame(resolve));
             const dataUrl = (await html2canvas(clone, {
                 scale: 2,
                 backgroundColor: null
@@ -335,13 +335,13 @@
                 container.style.width = pageWidth + "px", container.style.height = pageHeight + "px", 
                 logFunction("Preparing image ...", "warning");
                 const verticalBoxes = [];
-                container.querySelectorAll(".ocr-box").forEach((box => {
+                container.querySelectorAll(".ocr-box").forEach(box => {
                     const computed = getComputedStyle(box);
                     box.style.background = computed.background, box.style.backgroundColor = computed.backgroundColor, 
                     box.style.border = computed.border, box.style.fontFamily = computed.fontFamily, 
                     box.style.fontSize = computed.fontSize, box.style.color = computed.color, box.style.padding = computed.padding, 
                     box.style.margin = computed.margin, box.style.boxShadow = computed.boxShadow, "vertical-rl" === computed.writingMode && verticalBoxes.push(box);
-                }));
+                });
                 const tempImages = [];
                 for (const box of verticalBoxes) {
                     const {dataUrl: dataUrl, cloneWidth: cloneWidth, cloneHeight: cloneHeight} = await ImageExporterFacade.processVerticalBox(box), computed = getComputedStyle(box), left = parseFloat(computed.left) + cloneHeight, top = parseFloat(computed.top), img = new Image;
@@ -375,18 +375,18 @@
                 container.style.background = backupBackground, download) {
                     logFunction("Image Ready ✅", "success");
                     const link = document.createElement("a");
-                    link.href = imgData, link.download = `${fileName}_translated.png`, link.addEventListener("error", (() => {
+                    link.href = imgData, link.download = `${fileName}_translated.png`, link.addEventListener("error", () => {
                         logFunction("Download canceled", "warning");
-                    })), document.body.appendChild(link), link.click(), document.body.removeChild(link);
+                    }), document.body.appendChild(link), link.click(), document.body.removeChild(link);
                 } else {
                     let overlayImg = document.getElementById("overlayCanvasImage");
                     overlayImg || (overlayImg = document.createElement("img"), overlayImg.id = "overlayCanvasImage", 
                     overlayImg.style.position = "absolute", overlayImg.style.top = "0", overlayImg.style.left = "0", 
                     overlayImg.style.width = "100%", overlayImg.style.height = "auto", overlayImg.style.zIndex = "9998", 
                     container.appendChild(overlayImg)), overlayImg.src = imgData, overlayImg.style.display = "block", 
-                    container.querySelectorAll(".ocr-box").forEach((box => {
+                    container.querySelectorAll(".ocr-box").forEach(box => {
                         box.style.display = "none";
-                    }));
+                    });
                     const button = document.getElementById("downloadPdf");
                     button && (button.disabled = !0);
                     const headerButtons = document.querySelector(".headerButtons");
@@ -422,18 +422,18 @@
                     type: this.type,
                     callDelay: this.queueDelay
                 }
-            }), this.worker.addEventListener("message", (e => {
+            }), this.worker.addEventListener("message", e => {
                 e.data.type;
                 const data = e.data;
                 data.requestId && this.pendingWorkerRequests[data.requestId] && ("success" === data.status ? this.pendingWorkerRequests[data.requestId].resolve(data.translation) : this.pendingWorkerRequests[data.requestId].reject(new Error(data.error)), 
                 delete this.pendingWorkerRequests[data.requestId]);
-            }));
+            });
         }
         stopWorker() {
             this.worker.terminate(), this.worker = null, this.pendingWorkerRequests = {};
         }
         async translateText(text) {
-            return new Promise(((resolve, reject) => {
+            return new Promise((resolve, reject) => {
                 const requestId = "req_" + ImmUtils.generateUUID();
                 this.pendingWorkerRequests[requestId] = {
                     resolve: resolve,
@@ -443,7 +443,20 @@
                     text: text,
                     requestId: requestId
                 });
-            }));
+            });
+        }
+        async translateBatch(batchPayload) {
+            return new Promise((resolve, reject) => {
+                const requestId = "batch_" + ImmUtils.generateUUID();
+                this.pendingWorkerRequests[requestId] = {
+                    resolve: resolve,
+                    reject: reject
+                }, this.worker.postMessage({
+                    action: "translateBatch",
+                    batchPayload: batchPayload,
+                    requestId: requestId
+                });
+            });
         }
     }
     class NotificationManager {
@@ -463,9 +476,9 @@
             const notification = document.createElement("div");
             for (this.container || (this.container = this._createContainer()); this.container.children.length >= this.maxNotifications; ) this.container.removeChild(this.container.firstChild);
             notification.className = `notification ${severity}`, notification.textContent = message, 
-            this.container.appendChild(notification), setTimeout((() => {
-                notification.classList.add("fade-out"), notification.addEventListener("animationend", (() => notification.remove()));
-            }), duration);
+            this.container.appendChild(notification), setTimeout(() => {
+                notification.classList.add("fade-out"), notification.addEventListener("animationend", () => notification.remove());
+            }, duration);
         }
     }
     class BaseUIManager {
@@ -477,28 +490,28 @@
             const container = this.createTranslationContainer();
             container && !document.getElementById("resetButton") && container.appendChild(this._createResetButton()), 
             document.getElementById("translationFeedbackBox") || container.appendChild(this.createFeedbackBox()), 
-            setTimeout((() => {
+            setTimeout(() => {
                 container && container.classList.add("hidden");
-            }), 1e3), this.created = !0;
+            }, 1e3), this.created = !0;
         }
         removeUI(duration = 2e3) {
             if (this.removed) return;
             document.getElementById("translationContainer").classList.remove("hidden");
             const box = document.getElementById("translationFeedbackBox");
-            setTimeout((() => {
-                box.classList.add("fade-out"), box.addEventListener("animationend", (() => {
+            setTimeout(() => {
+                box.classList.add("fade-out"), box.addEventListener("animationend", () => {
                     box.remove(), document.getElementById("translationContainer").classList.remove("hidden");
-                }));
-            }), duration), this.removed = !0;
+                });
+            }, duration), this.removed = !0;
         }
         _createResetButton() {
             const resetBtn = document.createElement("button");
             return resetBtn.className = "immTransl-control-btn reset", resetBtn.title = "Reset", 
             resetBtn.id = "resetButton", resetBtn.innerHTML = '<svg version="1.0" xmlns="http://www.w3.org/2000/svg"      width="24.000000pt" height="24.000000pt" viewBox="0 0 512.000000 512.000000"      preserveAspectRatio="xMidYMid meet">     <g transform="translate(0.000000,512.000000) scale(0.100000,-0.100000)"     fill="#fff" stroke="none">     <path d="M2390 4794 c-441 -40 -832 -189 -1180 -448 -123 -91 -346 -315 -436     -436 -229 -308 -373 -652 -431 -1030 -24 -158 -24 -482 0 -640 50 -325 167     -635 341 -900 98 -149 164 -230 300 -366 344 -343 765 -554 1256 -630 159 -25     481 -25 640 0 825 127 1497 673 1784 1450 55 148 49 224 -23 289 -46 41 -68     49 -229 82 -128 26 -162 25 -222 -6 -60 -30 -97 -79 -139 -183 -145 -354 -401     -644 -726 -822 -726 -395 -1636 -169 -2097 520 -367 549 -355 1274 30 1816 86     121 251 286 372 372 169 120 400 223 592 262 439 90 826 4 1190 -266 l80 -60     -181 -182 c-116 -118 -187 -197 -197 -222 -53 -124 21 -267 151 -294 34 -7     256 -10 661 -8 l609 3 45 25 c24 14 58 45 75 68 l30 44 3 646 2 646 -26 53     c-33 69 -103 113 -180 113 -87 0 -130 -30 -343 -244 l-194 -194 -76 60 c-308     246 -651 403 -1011 463 -92 16 -379 27 -470 19z"/>     </g>     </svg>', 
-            resetBtn.disabled = !1, resetBtn.addEventListener("click", (b => {
+            resetBtn.disabled = !1, resetBtn.addEventListener("click", b => {
                 ImmUtils.resetTranslation(BaseUIManager.showNotification, this.updateFeedback), 
                 b.remove;
-            })), resetBtn;
+            }), resetBtn;
         }
         _createControlButtons() {
             const controlContainer = document.createElement("div");
@@ -513,17 +526,17 @@
             const cancelBtn = document.createElement("button");
             return cancelBtn.className = "immTransl-control-btn cancel", cancelBtn.title = "Cancel", 
             cancelBtn.innerHTML = '<svg version="1.0" xmlns="http://www.w3.org/2000/svg"      width="12.000000pt" height="12.000000pt" viewBox="0 0 512.000000 512.000000"      preserveAspectRatio="xMidYMid meet">     <g transform="translate(0.000000,512.000000) scale(0.100000,-0.100000)"     fill="#fff" stroke="none">     <path d="M579 5107 c-26 -7 -68 -27 -95 -45 -58 -37 -401 -381 -431 -432 -36     -60 -56 -147 -49 -212 14 -133 -28 -86 888 -1003 461 -462 838 -847 838 -855     0 -8 -377 -393 -838 -855 -911 -912 -873 -869 -888 -997 -8 -72 17 -169 61     -233 19 -28 117 -132 217 -231 223 -221 254 -239 393 -239 164 1 96 -57 1044     891 458 459 838 833 843 832 6 -2 385 -378 842 -835 944 -944 878 -887 1041     -888 139 0 170 18 393 239 100 99 198 203 217 231 44 64 69 161 61 233 -15     128 23 85 -888 997 -461 462 -838 847 -838 855 0 8 377 393 838 855 911 912     873 869 888 997 8 72 -17 169 -61 233 -19 28 -117 132 -217 231 -223 221 -254     239 -393 239 -163 -1 -97 56 -1042 -889 -457 -457 -837 -831 -843 -831 -7 0     -386 374 -844 831 -741 741 -837 835 -890 859 -70 32 -177 42 -247 22z"/>     </g>     </svg>', 
-            cancelBtn.disabled = !1, pauseBtn.addEventListener("click", (() => {
+            cancelBtn.disabled = !1, pauseBtn.addEventListener("click", () => {
                 translationPaused || (translationPaused = !0, this.updateFeedback("Translation Paused", !1), 
                 pauseBtn.disabled = !0, resumeBtn.disabled = !1);
-            })), resumeBtn.addEventListener("click", (() => {
+            }), resumeBtn.addEventListener("click", () => {
                 translationPaused && (translationPaused = !1, this.updateFeedback("Translation Resumed", !0), 
                 resumeBtn.disabled = !0, pauseBtn.disabled = !1);
-            })), cancelBtn.addEventListener("click", (() => {
+            }), cancelBtn.addEventListener("click", () => {
                 translationCanceled || (translationCanceled = !0, this.updateFeedback("Translation Canceled", !1), 
                 pauseBtn.disabled = !0, resumeBtn.disabled = !0, cancelBtn.disabled = !0, this.removeFeedback(0), 
-                download && (document.getElementById("downloadPdf").disabled = !1), document.querySelectorAll(".text-spinner, .text-retry-button").forEach((el => el.remove())));
-            })), controlContainer.appendChild(pauseBtn), controlContainer.appendChild(resumeBtn), 
+                download && (document.getElementById("downloadPdf").disabled = !1), document.querySelectorAll(".text-spinner, .text-retry-button").forEach(el => el.remove()));
+            }), controlContainer.appendChild(pauseBtn), controlContainer.appendChild(resumeBtn), 
             controlContainer.appendChild(cancelBtn), controlContainer;
         }
         createTranslationContainer() {
@@ -541,13 +554,13 @@
                 box = document.createElement("div"), box.id = "translationFeedbackBox";
                 const arrow = document.createElement("div");
                 arrow.className = "immTransl-arrow", arrow.innerHTML = '<svg version="1.0" xmlns="http://www.w3.org/2000/svg"\n             width="32.000000pt" height="32.000000pt" viewBox="0 0 512.000000 512.000000"\n             preserveAspectRatio="xMidYMid meet">\n            <g transform="translate(0.000000,512.000000) scale(0.100000,-0.100000)"\n            fill="#fff" stroke="none">\n            <path d="M1400 5098 c-44 -17 -77 -44 -171 -137 -144 -143 -163 -177 -164\n            -286 0 -58 5 -91 19 -120 13 -27 333 -355 995 -1018 l976 -977 -977 -978\n            c-760 -760 -982 -987 -997 -1022 -14 -30 -21 -67 -21 -110 0 -103 29 -153 168\n            -291 98 -97 127 -119 175 -137 73 -28 131 -28 204 -1 56 20 108 71 1230 1193\n            1297 1296 1223 1214 1223 1346 0 132 74 50 -1223 1346 -1123 1123 -1174 1173\n            -1230 1193 -72 26 -136 26 -207 -1z"/>\n            </g>\n            </svg>\n              ', 
-                arrow.addEventListener("click", (function(e) {
+                arrow.addEventListener("click", function(e) {
                     e.stopPropagation(), document.getElementById("translationContainer").classList.toggle("hidden");
-                })), box.appendChild(arrow);
+                }), box.appendChild(arrow);
                 const spinner = document.createElement("div");
-                spinner.className = "spinner", spinner.addEventListener("click", (function(e) {
+                spinner.className = "spinner", spinner.addEventListener("click", function(e) {
                     e.stopPropagation(), box.classList.toggle("hidden");
-                })), box.appendChild(spinner);
+                }), box.appendChild(spinner);
                 const text = document.createElement("span");
                 text.id = "feedbackText", text.textContent = "Starting translation...", box.appendChild(text), 
                 box.appendChild(this._createControlButtons()), document.body.appendChild(box);
@@ -566,11 +579,11 @@
         removeFeedback(delay = 2e3) {
             document.getElementById("translationContainer").classList.remove("hidden");
             const box = document.getElementById("translationFeedbackBox");
-            setTimeout((() => {
-                box.classList.add("fade-out"), box.addEventListener("animationend", (() => {
+            setTimeout(() => {
+                box.classList.add("fade-out"), box.addEventListener("animationend", () => {
                     box.remove(), document.getElementById("translationContainer").classList.remove("hidden");
-                }));
-            }), delay);
+                });
+            }, delay);
         }
         static showNotification(message, severity, duration) {
             (new NotificationManager).showNotification(message, severity, duration);
@@ -613,7 +626,7 @@
             document.getElementById("downloadPdf").addEventListener("click", this.exportPdfCallback);
         }
         static async showPdfOptionsModal(maxPages) {
-            return new Promise(((resolve, reject) => {
+            return new Promise((resolve, reject) => {
                 if (document.getElementById("pdfOptionsOverlay")) return;
                 const overlay = document.createElement("div");
                 overlay.id = "pdfOptionsOverlay";
@@ -621,19 +634,19 @@
                 modal.id = "pdfOptionsModal", modal.innerHTML = '\n          <h2>PDF Options</h2>\n          <form id="pdfOptionsForm">\n            <div>\n              <input type="radio" id="optionAll" name="pdfOption" value="all" checked>\n              <label for="optionAll">Entire PDF</label>\n            </div>\n            <div>\n              <input type="radio" id="optionSpecific" name="pdfOption" value="specific">\n              <label for="optionSpecific">Specific Pages</label>\n              <input type="text" id="specificPages" placeholder="e.g. 1,3,5" disabled>\n            </div>\n            <div>\n              <input type="radio" id="optionRange" name="pdfOption" value="range">\n              <label for="optionRange">Page Range</label>\n              <div style="display: flex; gap: 10px; margin-top: 8px;">\n                <input type="number" id="rangeStart" placeholder="From" disabled>\n                <input type="number" id="rangeEnd" placeholder="To" disabled>\n              </div>\n            </div>\n            <div class="quality-container">\n              <label for="pdfQuality">PDF Quality (Optimal 70%):</label>\n              <input type="range" id="pdfQuality" min="10" max="100" value="70" style="vertical-align: middle; margin: 0 8px;">\n              <span id="pdfQualityValue">70%</span>\n            </div>\n            <div class="button-group">\n              <button type="button" id="cancelPdfOptions">Cancel</button>\n              <button type="submit" id="confirmPdfOptions">Download</button>\n            </div>\n          </form>\n          ', 
                 overlay.appendChild(modal), document.body.appendChild(overlay);
                 const pdfQualitySlider = modal.querySelector("#pdfQuality"), pdfQualityValue = modal.querySelector("#pdfQualityValue");
-                pdfQualitySlider.addEventListener("input", (() => {
+                pdfQualitySlider.addEventListener("input", () => {
                     pdfQualityValue.textContent = pdfQualitySlider.value + "%";
-                }));
+                });
                 const specificPagesInput = modal.querySelector("#specificPages"), rangeStartInput = modal.querySelector("#rangeStart"), rangeEndInput = modal.querySelector("#rangeEnd");
                 rangeStartInput.setAttribute("min", "1"), rangeStartInput.setAttribute("max", maxPages), 
                 rangeEndInput.setAttribute("min", "1"), rangeEndInput.setAttribute("max", maxPages);
-                modal.querySelectorAll('input[name="pdfOption"]').forEach((radio => {
-                    radio.addEventListener("change", (() => {
+                modal.querySelectorAll('input[name="pdfOption"]').forEach(radio => {
+                    radio.addEventListener("change", () => {
                         specificPagesInput.disabled = !modal.querySelector("#optionSpecific").checked, rangeStartInput.disabled = !modal.querySelector("#optionRange").checked, 
                         rangeEndInput.disabled = !modal.querySelector("#optionRange").checked;
-                    }));
-                }));
-                modal.querySelector("#pdfOptionsForm").addEventListener("submit", (e => {
+                    });
+                });
+                modal.querySelector("#pdfOptionsForm").addEventListener("submit", e => {
                     e.preventDefault();
                     const selectedOption = modal.querySelector('input[name="pdfOption"]:checked').value, result = {
                         type: selectedOption,
@@ -652,17 +665,17 @@
                             end: end
                         };
                     } else if ("specific" === selectedOption) {
-                        let pages = specificPagesInput.value.split(",").map((num => parseInt(num.trim()))).filter((num => !isNaN(num)));
+                        let pages = specificPagesInput.value.split(",").map(num => parseInt(num.trim())).filter(num => !isNaN(num));
                         if (0 === pages.length) return void alert("Please enter at least one valid page number.");
-                        if (pages.filter((page => page < 1 || page > maxPages)).length > 0) return void alert(`All page numbers must be between 1 and ${maxPages}.`);
+                        if (pages.filter(page => page < 1 || page > maxPages).length > 0) return void alert(`All page numbers must be between 1 and ${maxPages}.`);
                         result.pages = pages;
                     }
                     document.body.removeChild(overlay), resolve(result);
-                }));
-                modal.querySelector("#cancelPdfOptions").addEventListener("click", (() => {
+                });
+                modal.querySelector("#cancelPdfOptions").addEventListener("click", () => {
                     document.body.removeChild(overlay);
-                }));
-            }));
+                });
+            });
         }
         applyZoom() {
             const pdf_viewer = document.getElementById("pdf-viewer");
@@ -710,9 +723,9 @@
             document.getElementById("pageIndicator").textContent = `${this.currentPageIndex + 1} of ${this.totalPages}`;
         }
         showCurrentPage() {
-            if (this.pageContainers.forEach(((container, index) => {
+            if (this.pageContainers.forEach((container, index) => {
                 container.style.display = "block";
-            })), this.pageContainers[this.currentPageIndex]) {
+            }), this.pageContainers[this.currentPageIndex]) {
                 this.pageContainers[this.currentPageIndex].scrollIntoView({
                     behavior: "smooth",
                     block: "start"
@@ -722,28 +735,28 @@
         }
         addToolbarListeners(pdfDoc, worker, translator, scale) {
             document.getElementById("pdf-container");
-            document.getElementById("prevPage").addEventListener("click", (async () => {
+            document.getElementById("prevPage").addEventListener("click", async () => {
                 this.currentPageIndex > 0 && (this.currentPageIndex--, this.showCurrentPage());
-            })), document.getElementById("nextPage").addEventListener("click", (() => {
+            }), document.getElementById("nextPage").addEventListener("click", () => {
                 this.currentPageIndex < this.totalPages - 1 && (this.currentPageIndex++, this.showCurrentPage());
-            })), document.getElementById("zoomIn").addEventListener("click", (() => {
+            }), document.getElementById("zoomIn").addEventListener("click", () => {
                 this.zoomIn();
-            })), document.getElementById("zoomOut").addEventListener("click", (() => {
+            }), document.getElementById("zoomOut").addEventListener("click", () => {
                 this.zoomOut();
-            }));
+            });
         }
         async createPdfPages(pdfDoc) {
             this.totalPages = pdfDoc.numPages;
-            const pageProcessor = new ProcessPdfPageFacede, processCommand = new ProcessPdfPageCommand(pageProcessor), observer = new IntersectionObserver((entries => {
-                entries.forEach((entry => {
+            const pageProcessor = new ProcessPdfPageFacede, processCommand = new ProcessPdfPageCommand(pageProcessor), observer = new IntersectionObserver(entries => {
+                entries.forEach(entry => {
                     const requiredVisibility = (() => {
                         const viewportWidth = window.innerWidth;
                         return viewportWidth <= 600 ? .5 : viewportWidth <= 1200 ? .35 : viewportWidth <= 1800 ? .25 : .15;
                     })();
                     entry.isIntersecting && entry.intersectionRatio * this.zoomFactor >= requiredVisibility && (this.currentPageIndex = Array.from(this.pageContainers).indexOf(entry.target), 
                     this.updatePageIndicator());
-                }));
-            }), {
+                });
+            }, {
                 root: null,
                 threshold: [ 0, .15, .25, .35, .5, .75, 1 ],
                 rootMargin: "0px"
@@ -849,50 +862,50 @@
             this.adapter = adapter, this.translator = translator, this._overlayUpdateScheduled = !1;
         }
         static debouncedUpdate(e, t, i) {
-            OCRStrategy.debounce(((element, tempCanvas, iElementData) => {
+            OCRStrategy.debounce((element, tempCanvas, iElementData) => {
                 OCRStrategy.updateOverlay(element, tempCanvas, iElementData), this._overlayUpdateScheduled = !1;
-            }), 100)(e, t, i);
+            }, 100)(e, t, i);
         }
         async process(element) {
             throw new Error("Metodo process() non implementato in OCRStrategy");
         }
         static adjustFontSize(box) {
             const handles = box.querySelectorAll(".resize-handle"), handleDisplays = [];
-            handles.forEach((handle => {
+            handles.forEach(handle => {
                 handleDisplays.push(handle.style.display), handle.style.display = "none";
-            }));
+            });
             let fontSize, low = 1e-5, high = 30;
             for (let i = 0; i < 10; i++) fontSize = (low + high) / 2, box.style.fontSize = fontSize + "px", 
             box.scrollHeight <= box.clientHeight ? low = fontSize : high = fontSize;
             box.style.fontSize = low + "px";
             let idx = 0;
-            handles.forEach((handle => {
+            handles.forEach(handle => {
                 handle.style.display = handleDisplays[idx++];
-            }));
+            });
         }
         static retryOcrBoxTranslation(img, idx, trFunc) {
-            const boxes = Array.from(img.parentElement.querySelectorAll(".ocr-box")), box = boxes.find((b => parseInt(b.getAttribute("data-ocr-index"), 10) === Number(idx)));
+            const boxes = Array.from(img.parentElement.querySelectorAll(".ocr-box")), box = boxes.find(b => parseInt(b.getAttribute("data-ocr-index"), 10) === Number(idx));
             if (idx < 0 || idx >= boxes.length) return;
             if (!box) return;
             const dataAttr = box.getAttribute("data-ocr-info");
             if (!dataAttr) return;
             const data = JSON.parse(dataAttr), translator = trFunc || img.ocrTranslator;
             translator && (data.translatedText = "", box.setAttribute("data-ocr-info", JSON.stringify(data)), 
-            OCRStrategy.updateBoxesInChunks(img, [ box ]), translator.translateText(data.originalText.replace(/<br>/gi, "[[BR]]")).then((translatedText => {
+            OCRStrategy.updateBoxesInChunks(img, [ box ]), translator.translateText(data.originalText.replace(/<br>/gi, "[[BR]]")).then(translatedText => {
                 const finalText = ImmUtils.decodeHTMLEntities(translatedText).replace(/\[\[BR\]\]/g, "<br>");
                 data.translatedText = finalText, box.setAttribute("data-ocr-info", JSON.stringify(data)), 
                 OCRStrategy.updateBoxesInChunks(img, [ box ]);
-            })).catch((e => {
+            }).catch(e => {
                 data.translatedText = "[[ERROR]]", box.setAttribute("data-ocr-info", JSON.stringify(data)), 
                 OCRStrategy.updateBoxesInChunks(img, [ box ]);
-            })));
+            }));
         }
         static sampleMedianColor(ctx, x, y, width, height) {
             const data = ctx.getImageData(x, y, width, height).data, rValues = [], gValues = [], bValues = [], aValues = [];
             for (let i = 0; i < data.length; i += 4) rValues.push(data[i]), gValues.push(data[i + 1]), 
             bValues.push(data[i + 2]), aValues.push(data[i + 3]);
             function median(values) {
-                values.sort(((a, b) => a - b));
+                values.sort((a, b) => a - b);
                 const mid = Math.floor(values.length / 2);
                 return values.length % 2 == 0 ? (values[mid - 1] + values[mid]) / 2 : values[mid];
             }
@@ -913,7 +926,7 @@
                 const data = b?.getAttribute("data-ocr-info");
                 if (data) {
                     const d = JSON.parse(data);
-                    setTimeout((() => updateBox(b, d, 0)), 50);
+                    setTimeout(() => updateBox(b, d, 0), 50);
                 }
                 return;
             }
@@ -922,7 +935,7 @@
                 const data = b?.getAttribute("data-ocr-info");
                 if (data) {
                     const d = JSON.parse(data);
-                    setTimeout((() => updateBox(b, d, lastTranslatedIndex)), 50);
+                    setTimeout(() => updateBox(b, d, lastTranslatedIndex), 50);
                 }
                 return;
             }
@@ -930,24 +943,24 @@
             function updateBox(box, data, boxIndex) {
                 if (!box) return;
                 const html = box.innerHTML.trim(), {bbox: bbox, translatedText: translatedText, baseline: baseline} = data, x = offsetX + bbox.x0 * zoomFactor, y = offsetY + bbox.y0 * zoomFactor, boxWidth = (bbox.x1 - bbox.x0) * zoomFactor, boxHeight = (bbox.y1 - bbox.y0) * zoomFactor;
-                if (requestAnimationFrame((() => {
+                if (requestAnimationFrame(() => {
                     box.style.setProperty("--pos-x", `${x}px`), box.style.setProperty("--pos-y", `${y}px`), 
                     box.style.setProperty("--box-width", `${boxWidth}px`), box.style.setProperty("--box-height", `${boxHeight}px`);
-                })), -1 === boxIndex && (html.includes('class="spinner"') || html.includes("ocr-retry-btn"))) return;
+                }), -1 === boxIndex && (html.includes('class="spinner"') || html.includes("ocr-retry-btn"))) return;
                 if (translatedText && "" !== translatedText) if ("[[ERROR]]" === translatedText) {
-                    box.querySelectorAll(":scope > .spinner, :scope > .ocr-retry-btn, :scope > .ocr-box-text").forEach((el => el.remove()));
+                    box.querySelectorAll(":scope > .spinner, :scope > .ocr-retry-btn, :scope > .ocr-box-text").forEach(el => el.remove());
                     const btn = document.createElement("button");
                     btn.className = "ocr-retry-btn", btn.textContent = "↻", currTranslator && (btn.onclick = function(e) {
                         e.preventDefault(), e.stopPropagation(), OCRStrategy.retryOcrBoxTranslation(element, box.dataset.index, currTranslator);
                     }), box.appendChild(btn), box.classList.add("ocr-box-error"), box.style.cursor = "pointer", 
                     box.contentEditable = "false";
                 } else {
-                    box.querySelectorAll(":scope > .spinner, :scope > .ocr-retry-btn, :scope > .ocr-box-text").forEach((el => el.remove()));
+                    box.querySelectorAll(":scope > .spinner, :scope > .ocr-retry-btn").forEach(el => el.remove());
                     const textEl = document.createElement("div");
                     textEl.className = "ocr-box-text", textEl.innerHTML = translatedText, box.appendChild(textEl), 
                     box.classList.remove("ocr-box-error"), OCRStrategy.calculateBoxColor(data, element, corsFreeCanvas, bbox, box, parseInt(box.dataset.index));
                 } else {
-                    box.querySelectorAll(":scope > .spinner, :scope > .ocr-retry-btn, :scope > .ocr-box-text").forEach((el => el.remove()));
+                    box.querySelectorAll(":scope > .spinner, :scope > .ocr-retry-btn, :scope > .ocr-box-text").forEach(el => el.remove());
                     const spinner = document.createElement("div");
                     spinner.className = "spinner", box.appendChild(spinner), box.classList.remove("ocr-box-error"), 
                     box.style.cursor = "default", box.contentEditable = "false";
@@ -972,14 +985,14 @@
                 isVertical ? 90 != angleDeg && -90 != angleDeg ? (box.style.writingMode = "vertical-rl", 
                 box.style.transformOrigin = "center center") : (box.style.transformOrigin = "bottom left", 
                 rotationTransform = dy < 0 ? `rotate(${angleDeg}deg) scaleX(1)` : "") : (rotationTransform = `rotate(${angleDeg}deg)`, 
-                box.style.transformOrigin = "top left"), requestAnimationFrame((() => {
+                box.style.transformOrigin = "top left"), requestAnimationFrame(() => {
                     box.dataset.rotation = angleDeg, box.style.transform = `${rotationTransform}`;
-                }));
+                });
                 try {
                     OCRStrategy.adjustFontSize(box);
                 } catch (e) {}
             }
-            requestAnimationFrame((function updateChunk() {
+            requestAnimationFrame(function updateChunk() {
                 for (let j = 0; j < 5 && currentIndex < boxes.length; j++, currentIndex++) {
                     let b = boxes[currentIndex];
                     const d = b?.getAttribute("data-ocr-info");
@@ -987,12 +1000,12 @@
                     updateBox(b, JSON.parse(d), -1);
                 }
                 currentIndex < boxes.length && setTimeout(updateChunk, 50);
-            }));
+            });
         }
         static updateOverlay(element, corsFreeCanvas = null, iElementData = null, translator = null) {
             const container = element.parentElement;
             if (!element.ocrData) {
-                const boxes = Array.from(container.querySelectorAll(".ocr-box")).sort(((a, b) => parseInt(a.getAttribute("data-ocr-index"), 10) - parseInt(b.getAttribute("data-ocr-index"), 10)));
+                const boxes = Array.from(container.querySelectorAll(".ocr-box")).sort((a, b) => parseInt(a.getAttribute("data-ocr-index"), 10) - parseInt(b.getAttribute("data-ocr-index"), 10));
                 if (0 === boxes.length) return;
                 const canvasRect = element.getBoundingClientRect(), containerRect = container.getBoundingClientRect(), baseWidth = element.ocrBaseWidth || canvasRect.width;
                 let pdfZoomFactor = 0;
@@ -1069,10 +1082,10 @@
             }
             let zoomFactor;
             zoomFactor = pdfZoomFactor > 0 ? imgRect.width / baseWidth / pdfZoomFactor : imgRect.width / baseWidth, 
-            boxes.forEach((box => {
+            boxes.forEach(box => {
                 if (OCRStrategy._initializedBoxes.has(box)) return;
                 const handles = {};
-                [ "top", "right", "bottom", "left" ].forEach((side => {
+                [ "top", "right", "bottom", "left" ].forEach(side => {
                     const handle = document.createElement("div");
                     handle.className = "resize-handle " + side, handle.style.position = "absolute", 
                     handle.style.background = "transparent", "top" === side || "bottom" === side ? (handle.style.height = "8px", 
@@ -1081,8 +1094,8 @@
                     handle.style.height = "100%", handle.style.top = "0", handle.style.cursor = "ew-resize", 
                     "left" === side ? handle.style.left = "-4px" : handle.style.right = "-4px"), box.appendChild(handle), 
                     handles[side] = handle;
-                }));
-                [ "top-left", "top-right", "bottom-right", "bottom-left" ].forEach((corner => {
+                });
+                [ "top-left", "top-right", "bottom-right", "bottom-left" ].forEach(corner => {
                     const handle = document.createElement("div");
                     handle.className = "resize-handle " + corner, handle.style.position = "absolute", 
                     handle.style.background = "transparent", handle.style.width = "12px", handle.style.height = "12px", 
@@ -1092,7 +1105,7 @@
                     handle.style.right = "-6px", handle.style.cursor = "nwse-resize") : "bottom-left" === corner && (handle.style.bottom = "-6px", 
                     handle.style.left = "-6px", handle.style.cursor = "nesw-resize"), box.appendChild(handle), 
                     handles[corner] = handle;
-                }));
+                });
                 let dragStartX, dragStartY, origX, origY, currentDraggingBox = null, isDragging = !1, dragTimer = null, dragStartTime = 0, updatePending = !1;
                 function preventDefault(e) {
                     e.preventDefault();
@@ -1104,7 +1117,7 @@
                             textElement && (textElement.contentEditable = "false");
                         }
                         document.addEventListener("mouseup", onDragEnd), document.addEventListener("touchend", onDragEnd), 
-                        dragStartTime = Date.now(), currentDraggingBox = this, dragTimer = setTimeout((() => {
+                        dragStartTime = Date.now(), currentDraggingBox = this, dragTimer = setTimeout(() => {
                             isDragging = !0, updatePending = !0, box.style.cursor = "move", box.classList.add("dragging"), 
                             function disableScrollOnContainer() {
                                 const pdfContainer = document.getElementById("pdf-container");
@@ -1116,7 +1129,7 @@
                             }), dragStartX = e.touches ? e.touches[0].clientX : e.clientX, dragStartY = e.touches ? e.touches[0].clientY : e.clientY, 
                             origX = parseFloat(getComputedStyle(box).left) || 0, origY = parseFloat(getComputedStyle(box).top) || 0, 
                             e.preventDefault();
-                        }), 300);
+                        }, 300);
                     }
                 }
                 function onDragEnd(e) {
@@ -1190,39 +1203,39 @@
                 }), box._dragHandlers = {
                     mousemove: onDrag,
                     touchmove: onDrag
-                }, attachResizeListener(handles.right, (function(box, origWidth, origHeight, origLeft, origTop, diffX, diffY) {
+                }, attachResizeListener(handles.right, function(box, origWidth, origHeight, origLeft, origTop, diffX, diffY) {
                     const angle = parseFloat(box.dataset.rotation) || 0;
                     Math.abs(Math.abs(angle) - 90) < 1 ? box.style.setProperty("--box-height", `${origHeight + diffX}px`) : box.style.setProperty("--box-width", `${origWidth + diffX}px`), 
                     OCRStrategy.adjustFontSize(box);
-                })), attachResizeListener(handles.left, (function(box, origWidth, origHeight, origLeft, origTop, diffX, diffY) {
+                }), attachResizeListener(handles.left, function(box, origWidth, origHeight, origLeft, origTop, diffX, diffY) {
                     const angle = parseFloat(box.dataset.rotation) || 0;
                     Math.abs(Math.abs(angle) - 90) < 1 ? (box.style.setProperty("--box-height", origHeight - diffX + "px"), 
                     box.style.setProperty("--pos-y", `${origTop + diffX}px`)) : (box.style.setProperty("--box-width", origWidth - diffX + "px"), 
                     box.style.setProperty("--pos-x", `${origLeft + diffX}px`)), OCRStrategy.adjustFontSize(box);
-                })), attachResizeListener(handles.bottom, (function(box, origWidth, origHeight, origLeft, origTop, diffX, diffY) {
+                }), attachResizeListener(handles.bottom, function(box, origWidth, origHeight, origLeft, origTop, diffX, diffY) {
                     const angle = parseFloat(box.dataset.rotation) || 0;
                     Math.abs(Math.abs(angle) - 90) < 1 ? box.style.setProperty("--box-width", `${origWidth + diffY}px`) : box.style.setProperty("--box-height", `${origHeight + diffY}px`), 
                     OCRStrategy.adjustFontSize(box);
-                })), attachResizeListener(handles.top, (function(box, origWidth, origHeight, origLeft, origTop, diffX, diffY) {
+                }), attachResizeListener(handles.top, function(box, origWidth, origHeight, origLeft, origTop, diffX, diffY) {
                     const angle = parseFloat(box.dataset.rotation) || 0;
                     Math.abs(Math.abs(angle) - 90) < 1 ? (box.style.setProperty("--box-width", origWidth - diffY + "px"), 
                     box.style.setProperty("--pos-x", `${origLeft + diffY}px`)) : (box.style.setProperty("--pos-y", `${origTop + diffY}px`), 
                     box.style.setProperty("--box-height", origHeight - diffY + "px")), OCRStrategy.adjustFontSize(box);
-                })), attachResizeListener(handles["top-left"], (function(box, origWidth, origHeight, origLeft, origTop, diffX, diffY) {
+                }), attachResizeListener(handles["top-left"], function(box, origWidth, origHeight, origLeft, origTop, diffX, diffY) {
                     box.style.setProperty("--pos-x", `${origLeft + diffX}px`), box.style.setProperty("--pos-y", `${origTop + diffY}px`), 
                     box.style.setProperty("--box-width", origWidth - diffX + "px"), box.style.setProperty("--box-height", origHeight - diffY + "px"), 
                     OCRStrategy.adjustFontSize(box);
-                })), attachResizeListener(handles["top-right"], (function(box, origWidth, origHeight, origLeft, origTop, diffX, diffY) {
+                }), attachResizeListener(handles["top-right"], function(box, origWidth, origHeight, origLeft, origTop, diffX, diffY) {
                     box.style.setProperty("--box-height", origHeight - diffY + "px"), box.style.setProperty("--box-width", `${origWidth + diffX}px`), 
                     box.style.setProperty("--pos-y", `${origTop + diffY}px`), OCRStrategy.adjustFontSize(box);
-                })), attachResizeListener(handles["bottom-right"], (function(box, origWidth, origHeight, origLeft, origTop, diffX, diffY) {
+                }), attachResizeListener(handles["bottom-right"], function(box, origWidth, origHeight, origLeft, origTop, diffX, diffY) {
                     box.style.setProperty("--box-width", `${origWidth + diffX}px`), box.style.setProperty("--box-height", `${origHeight + diffY}px`), 
                     OCRStrategy.adjustFontSize(box);
-                })), attachResizeListener(handles["bottom-left"], (function(box, origWidth, origHeight, origLeft, origTop, diffX, diffY) {
+                }), attachResizeListener(handles["bottom-left"], function(box, origWidth, origHeight, origLeft, origTop, diffX, diffY) {
                     box.style.setProperty("--box-width", origWidth - diffX + "px"), box.style.setProperty("--box-height", `${origHeight + diffY}px`), 
                     box.style.setProperty("--pos-x", `${origLeft + diffX}px`), OCRStrategy.adjustFontSize(box);
-                })), OCRStrategy._initializedBoxes.add(box);
-            }));
+                }), OCRStrategy._initializedBoxes.add(box);
+            });
         }
         static updateBoxOcrData(box, offsetX, offsetY, zoomFactor, img, canvas = null, color = !1) {
             const computed = getComputedStyle(box), newLeft = parseFloat(computed.left), newTop = parseFloat(computed.top), newX0 = (newLeft - offsetX) / zoomFactor, newY0 = (newTop - offsetY) / zoomFactor, newX1 = (newLeft - offsetX + parseFloat(computed.width)) / zoomFactor, newY1 = (newTop - offsetY + parseFloat(computed.height)) / zoomFactor, index = parseInt(box.dataset.index, 10), dataStr = box.getAttribute("data-ocr-info");
@@ -1250,10 +1263,10 @@
                     angle: angle
                 };
             }
-            const boxes = ocrData.map((item => ({
+            const boxes = ocrData.map(item => ({
                 item: item,
                 features: computeBoxFeatures(item)
-            })));
+            }));
             let totalWidth = 0, totalHeight = 0;
             function frontierPoints(bbox, direction) {
                 const {x0: x0, y0: y0, x1: x1, y1: y1} = bbox;
@@ -1345,9 +1358,9 @@
                 let angleDiff = Math.abs(angle1 - angle2);
                 return angleDiff > 90 && (angleDiff = 180 - angleDiff), minDistance + angleDiff;
             }
-            boxes.forEach((b => {
+            boxes.forEach(b => {
                 totalWidth += b.features.width, totalHeight += b.features.height;
-            }));
+            });
             const clusters = [], visited = new Array(boxes.length).fill(!1), assigned = new Array(boxes.length).fill(!1), noise = [];
             function regionQuery(idx) {
                 const neighbors = [];
@@ -1377,16 +1390,16 @@
                 }
             }
             function median(arr) {
-                const sorted = arr.slice().sort(((a, b) => a - b)), mid = Math.floor(sorted.length / 2);
+                const sorted = arr.slice().sort((a, b) => a - b), mid = Math.floor(sorted.length / 2);
                 return sorted.length % 2 == 0 ? (sorted[mid - 1] + sorted[mid]) / 2 : sorted[mid];
             }
-            noise.filter((i => !assigned[i])).forEach((i => {
+            noise.filter(i => !assigned[i]).forEach(i => {
                 clusters.push([ i ]);
-            }));
-            return clusters.map((clusterIndices => {
-                const clusterItems = clusterIndices.map((i => boxes[i].item));
-                clusterItems.sort(((a, b) => a.bbox.y0 !== b.bbox.y0 ? a.bbox.y0 - b.bbox.y0 : a.bbox.x0 - b.bbox.x0));
-                const x0 = Math.min(...clusterItems.map((item => item.bbox.x0))), y0 = Math.min(...clusterItems.map((item => item.bbox.y0))), x1 = Math.max(...clusterItems.map((item => item.bbox.x1))), y1 = Math.max(...clusterItems.map((item => item.bbox.y1))), aggregatedText = clusterItems.map((item => item.text)).join(" "), baselines = clusterItems.map((item => item.baseline)).filter((b => b));
+            });
+            return clusters.map(clusterIndices => {
+                const clusterItems = clusterIndices.map(i => boxes[i].item);
+                clusterItems.sort((a, b) => a.bbox.y0 !== b.bbox.y0 ? a.bbox.y0 - b.bbox.y0 : a.bbox.x0 - b.bbox.x0);
+                const x0 = Math.min(...clusterItems.map(item => item.bbox.x0)), y0 = Math.min(...clusterItems.map(item => item.bbox.y0)), x1 = Math.max(...clusterItems.map(item => item.bbox.x1)), y1 = Math.max(...clusterItems.map(item => item.bbox.y1)), aggregatedText = clusterItems.map(item => item.text).join(" "), baselines = clusterItems.map(item => item.baseline).filter(b => b);
                 return {
                     bbox: {
                         x0: x0,
@@ -1395,47 +1408,47 @@
                         y1: y1
                     },
                     baseline: {
-                        x0: median(baselines.map((b => b.x0))),
-                        y0: median(baselines.map((b => b.y0))),
-                        x1: median(baselines.map((b => b.x1))),
-                        y1: median(baselines.map((b => b.y1)))
+                        x0: median(baselines.map(b => b.x0)),
+                        y0: median(baselines.map(b => b.y0)),
+                        x1: median(baselines.map(b => b.x1)),
+                        y1: median(baselines.map(b => b.y1))
                     },
                     originalText: aggregatedText,
                     translatedText: ""
                 };
-            }));
+            });
         }
         static debounce(func, wait) {
             let timeout;
             return function(...args) {
-                clearTimeout(timeout), timeout = setTimeout((() => func.apply(this, args)), wait);
+                clearTimeout(timeout), timeout = setTimeout(() => func.apply(this, args), wait);
             };
         }
         scheduleOverlayUpdate(element, tempCanvas = null, iElementData = null) {
-            this._overlayUpdateScheduled || (this._overlayUpdateScheduled = !0, requestAnimationFrame((() => {
+            this._overlayUpdateScheduled || (this._overlayUpdateScheduled = !0, requestAnimationFrame(() => {
                 OCRStrategy.debouncedUpdate(element, tempCanvas, iElementData);
-            })));
+            }));
         }
         static getResultLines(result) {
             if (!result || !result.data || !result.data.blocks) return result.data = {
                 lines: []
             }, result;
-            const lines = result.data.blocks.map((block => block.paragraphs.map((paragraph => paragraph.lines)))).flat(2);
+            const lines = result.data.blocks.map(block => block.paragraphs.map(paragraph => paragraph.lines)).flat(2);
             return result.data.lines = lines, result;
         }
         async _processOcrResult(element, container, tempCanvas, result, groupingThreshold = 20) {
             result.data && result.data.lines || (result = OCRStrategy.getResultLines(result));
-            let filteredLines = result.data.lines.filter((line => "" !== line.text.trim()));
+            let filteredLines = result.data.lines.filter(line => "" !== line.text.trim());
             if (0 === filteredLines.length) return element.ocrData = [], void (element.dataset.ocrProcessed = "true");
-            const rawOcrData = filteredLines.map((line => ({
+            const rawOcrData = filteredLines.map(line => ({
                 bbox: line.bbox,
                 baseline: line.baseline,
                 translatedText: "",
                 text: line.text.trim()
-            }))), blocks = OCRStrategy.groupOcrData(rawOcrData, groupingThreshold);
+            })), blocks = OCRStrategy.groupOcrData(rawOcrData, groupingThreshold);
             element.ocrData = blocks, "static" === getComputedStyle(container).position && (container.style.position = "relative"), 
             ImmUtils.checkPaused(), ImmUtils.yieldControl(), OCRStrategy.updateOverlay(element, tempCanvas);
-            const boxes = Array.from(element.parentElement.querySelectorAll(".ocr-box")).sort(((a, b) => parseInt(a.getAttribute("data-ocr-index"), 10) - parseInt(b.getAttribute("data-ocr-index"), 10))), translationPromises = blocks.map((block => block.originalText.replace(/<br>/gi, "[[BR]]"))).map(((text, i) => (async () => {
+            const boxes = Array.from(element.parentElement.querySelectorAll(".ocr-box")).sort((a, b) => parseInt(a.getAttribute("data-ocr-index"), 10) - parseInt(b.getAttribute("data-ocr-index"), 10)), translationPromises = blocks.map(block => block.originalText.replace(/<br>/gi, "[[BR]]")).map((text, i) => (async () => {
                 const translator = this.translator;
                 try {
                     await ImmUtils.checkPaused();
@@ -1452,7 +1465,7 @@
                     OCRStrategy.updateOverlay(element, tempCanvas, i, translator);
                 }
                 await ImmUtils.yieldControl();
-            })()));
+            })());
             await Promise.all(translationPromises), element.dataset.ocrProcessed = "true";
         }
     }
@@ -1462,18 +1475,18 @@
         }
         async process(img) {
             if (await ImmUtils.checkPaused(), "true" === img.dataset.ocrProcessed) return;
-            img.complete || await new Promise((resolve => {
+            img.complete || await new Promise(resolve => {
                 img.onload = resolve;
-            }));
+            });
             let imageForOCR = img;
             if (!img.crossOrigin || "anonymous" !== img.crossOrigin) try {
-                const response = await fetch(img.src), blob = await response.blob(), dataUrl = await new Promise(((resolve, reject) => {
+                const response = await fetch(img.src), blob = await response.blob(), dataUrl = await new Promise((resolve, reject) => {
                     const reader = new FileReader;
                     reader.onload = () => resolve(reader.result), reader.onerror = reject, reader.readAsDataURL(blob);
-                }));
-                imageForOCR = new Image, imageForOCR.src = dataUrl, await new Promise((resolve => {
+                });
+                imageForOCR = new Image, imageForOCR.src = dataUrl, await new Promise(resolve => {
                     imageForOCR.onload = resolve;
-                }));
+                });
             } catch (error) {}
             let container = img.parentElement;
             container.classList.contains("ocr-container") || (container = document.createElement("div"), 
@@ -1499,7 +1512,7 @@
             if (!textPage || !textPage.items) throw new Error("Contenuto testo PDF non valido");
             return {
                 data: {
-                    lines: textPage.items.filter((item => item.str && "" !== item.str.trim())).map((item => {
+                    lines: textPage.items.filter(item => item.str && "" !== item.str.trim()).map(item => {
                         const t = pdfjsLib.Util.transform(viewport.transform, item.transform), x = t[4], y = t[5], width = item.width * viewport.scale, bbox = {
                             x0: x,
                             y0: y - item.height * viewport.scale,
@@ -1518,7 +1531,7 @@
                             baseline: baseline,
                             has_baseline: !0
                         };
-                    }))
+                    })
                 }
             };
         }
@@ -1566,16 +1579,102 @@
             return await ocrStrategy.process(element);
         }
     }
+    class BatchRequest {
+        constructor(id) {
+            this.id = id, this.nodes = [], this.texts = [], this.totalLength = 0, this.status = "pending", 
+            this.results = [];
+        }
+        addNode(node, text) {
+            this.nodes.push(node), this.texts.push(text), this.totalLength += text.length;
+        }
+        canAccommodate(textLength, maxLength) {
+            return this.totalLength + textLength <= maxLength;
+        }
+        isEmpty() {
+            return 0 === this.nodes.length;
+        }
+        getStructuredPayload() {
+            return {
+                batchId: this.id,
+                items: this.texts.map((text, index) => ({
+                    id: `item_${index}`,
+                    index: index,
+                    content: text
+                }))
+            };
+        }
+    }
+    class NodeRequestManager {
+        constructor() {
+            this.batchCounter = 0, this.activeRequests = new Map;
+        }
+        createBatch() {
+            return new BatchRequest(`batch_${++this.batchCounter}_${Date.now()}`);
+        }
+        async processBatchStructured(translationService, batch) {
+            try {
+                batch.status = "processing", this.activeRequests.set(batch.id, batch);
+                const structuredPayload = batch.getStructuredPayload(), batchResults = await translationService.translateBatch(structuredPayload);
+                return batch.results = batchResults.map((result, index) => ({
+                    index: void 0 !== result.index ? result.index : index,
+                    id: result.id || `item_${index}`,
+                    original: result.originalText || result.original,
+                    translated: result.translatedText || result.translated,
+                    status: result.success ? "success" : "error",
+                    error: result.error || null
+                })), batch.status = "completed", batch.results;
+            } catch (error) {
+                throw batch.status = "error", error;
+            } finally {
+                this.activeRequests.delete(batch.id);
+            }
+        }
+        async processBatchWithFallback(translationService, batch) {
+            try {
+                return await this.processBatchStructured(translationService, batch);
+            } catch (error) {
+                const results = [];
+                for (let i = 0; i < batch.nodes.length; i++) try {
+                    const translated = await translationService.translateText(batch.texts[i]);
+                    results.push({
+                        index: i,
+                        id: `item_${i}`,
+                        original: batch.texts[i],
+                        translated: translated,
+                        status: "success"
+                    });
+                } catch (nodeError) {
+                    results.push({
+                        index: i,
+                        id: `item_${i}`,
+                        original: batch.texts[i],
+                        translated: null,
+                        error: nodeError.message,
+                        status: "error"
+                    });
+                }
+                return results;
+            }
+        }
+        cancelAllRequests() {
+            for (const [batchId, batch] of this.activeRequests) batch.status = "cancelled";
+            this.activeRequests.clear();
+        }
+        getActiveRequestsCount() {
+            return this.activeRequests.size;
+        }
+    }
     class PageTranslationCore {
         constructor(translationService, uiManager, options) {
             this.uiManager = uiManager, this.translationService = translationService, this.total = 0, 
-            this.processed = 0, this.batchNodes = [], this.individualNodes = [], this.DELIMITER = options.delimiter || "[[BR]]", 
-            this.BATCH_MAX_LENGTH = options.batchMaxLength || 1e3, this.NODE_DELIMITER = options.nodeDelimiter || "[[ND]]";
+            this.processed = 0, this.batchNodes = [], this.individualNodes = [], this.punctuationOnlyNodes = [], 
+            this.BATCH_MAX_LENGTH = options?.batchMaxLength || 1e3, this.requestManager = new NodeRequestManager, 
+            this.nodeToRequest = new WeakMap, this.activeBatches = new Map;
         }
         processPageState(body) {
             ImmUtils.storeOriginalTextNodes();
-            const textNodes = ImmUtils.getTextNodes(document.body), total = textNodes.length;
-            textNodes.forEach((node => {
+            const textNodes = ImmUtils.getTextNodes(document.body), processedNodes = [];
+            textNodes.forEach(node => {
                 if ((!node.parentElement || !node.parentElement.classList.contains("translation-wrapper")) && node.parentNode) {
                     const wrapper = document.createElement("span");
                     if (wrapper.className = "translation-wrapper", node.parentNode.insertBefore(wrapper, node), 
@@ -1584,11 +1683,31 @@
                         spinner.className = "text-spinner", wrapper.appendChild(spinner);
                     }
                 }
-            }));
-            const batchNodes = [], individualNodes = [];
-            for (const node of textNodes) node.nodeValue.length > this.BATCH_MAX_LENGTH ? individualNodes.push(node) : batchNodes.push(node);
-            return this.total = total, this.batchNodes = batchNodes, this.individualNodes = individualNodes, 
-            total;
+                const nodeData = this.preprocessNodeForTranslation(node);
+                processedNodes.push(nodeData);
+            });
+            const batchNodes = [], individualNodes = [], punctuationOnlyNodes = [];
+            for (const nodeData of processedNodes) 0 === nodeData.cleanText.trim().length ? punctuationOnlyNodes.push(nodeData) : nodeData.cleanText.length > this.BATCH_MAX_LENGTH ? individualNodes.push(nodeData) : batchNodes.push(nodeData);
+            return this.total = processedNodes.length, this.batchNodes = batchNodes, this.individualNodes = individualNodes, 
+            this.punctuationOnlyNodes = punctuationOnlyNodes, this.total;
+        }
+        preprocessNodeForTranslation(node) {
+            const originalText = node.nodeValue, leadingMatch = originalText.match(/^[\s\p{P}]+/u), trailingMatch = originalText.match(/[\s\p{P}]+$/u), leadingPunctuation = leadingMatch ? leadingMatch[0] : "", trailingPunctuation = trailingMatch ? trailingMatch[0] : "", cleanText = originalText.replace(/^[\s\p{P}]+/u, "").replace(/[\s\p{P}]+$/u, "");
+            return {
+                node: node,
+                originalText: originalText,
+                cleanText: cleanText,
+                leadingPunctuation: leadingPunctuation,
+                trailingPunctuation: trailingPunctuation,
+                hasLeadingPunctuation: leadingPunctuation.length > 0,
+                hasTrailingPunctuation: trailingPunctuation.length > 0
+            };
+        }
+        applyTranslationWithPunctuation(nodeData, translatedText) {
+            let finalText = translatedText;
+            return nodeData.hasLeadingPunctuation && (finalText = nodeData.leadingPunctuation + finalText), 
+            nodeData.hasTrailingPunctuation && (finalText += nodeData.trailingPunctuation), 
+            finalText;
         }
         updateProgress() {
             this.processed += 1, this.uiManager.updateFeedback(`(${this.processed}/${this.total})`);
@@ -1621,7 +1740,7 @@
             }
         }
         async processPageNodes() {
-            await Promise.all([ this.processBatchNodes(), this.processIndividualNodes() ]), 
+            await Promise.all([ this.processBatchNodes(), this.processIndividualNodes(), this.processPunctuationOnlyNodes() ]), 
             ImmUtils.storeOriginalTextNodes();
         }
         async processBatchNodes() {
@@ -1632,13 +1751,15 @@
             }
         }
         async translateNodesIndividually() {
-            for (const node of this.batchNodes) {
+            for (const nodeData of this.batchNodes) {
                 await ImmUtils.checkPaused();
+                const node = nodeData.node;
                 let parent = node.parentElement;
                 if (parent) {
                     try {
-                        let result = await this.translationService.translateText(node.nodeValue);
-                        node.nodeValue = result, PageTranslationCore.removeSpinner(parent);
+                        let result = await this.translationService.translateText(nodeData.cleanText);
+                        const finalText = this.applyTranslationWithPunctuation(nodeData, result);
+                        node.nodeValue = finalText, PageTranslationCore.removeSpinner(parent);
                     } catch (err) {
                         PageTranslationCore.removeSpinner(parent), PageTranslationCore.addRetryButton(parent, node, this.translationService?.translateText?.bind(this.translationService));
                     }
@@ -1647,70 +1768,96 @@
             }
         }
         async translateNodesBatch() {
-            let batches = [], currentBatch = [], currentLength = 0;
-            for (const node of this.batchNodes) {
-                const text = node.nodeValue;
-                currentLength + text.length > this.BATCH_MAX_LENGTH && currentBatch.length > 0 && (batches.push([ ...currentBatch ]), 
-                currentBatch = [], currentLength = 0), currentBatch.push(node), currentLength += text.length;
-            }
-            currentBatch.length > 0 && batches.push([ ...currentBatch ]);
-            for (const batch of batches) await this.translateBatchRecursively(batch);
+            const batches = this.createStructuredBatches(this.batchNodes);
+            for (const batch of batches) await this.processBatchStructured(batch);
         }
-        async translateBatchRecursively(batch) {
+        createStructuredBatches(nodeDataArray) {
+            const batches = [];
+            let currentBatch = this.requestManager.createBatch();
+            for (const nodeData of nodeDataArray) {
+                const text = nodeData.cleanText;
+                currentBatch.canAccommodate(text.length, this.BATCH_MAX_LENGTH) || currentBatch.isEmpty() || (batches.push(currentBatch), 
+                currentBatch = this.requestManager.createBatch()), currentBatch.addNode(nodeData, text), 
+                this.nodeToRequest.set(nodeData, {
+                    batchId: currentBatch.id,
+                    nodeIndex: currentBatch.nodes.length - 1
+                });
+            }
+            return currentBatch.isEmpty() || batches.push(currentBatch), batches;
+        }
+        async processBatchStructured(batch) {
             await ImmUtils.checkPaused();
-            const combinedText = batch.map((node => node.nodeValue)).join(this.NODE_DELIMITER);
-            let translatedCombined;
             try {
-                translatedCombined = await this.translationService.translateText(combinedText);
-            } catch (e) {
-                if (1 === batch.length) {
-                    let node = batch[0], parent = node.parentElement;
-                    if (!parent) return;
-                    try {
-                        let result = await this.translationService.translateText(node.nodeValue);
-                        return node.nodeValue = result, PageTranslationCore.removeSpinner(parent), void this.updateProgress();
-                    } catch (err) {
-                        return PageTranslationCore.removeSpinner(parent), void PageTranslationCore.addRetryButton(parent, node, this.translationService?.translateText?.bind(this.translationService));
-                    }
+                this.activeBatches.set(batch.id, batch);
+                const results = await this.requestManager.processBatchWithFallback(this.translationService, batch);
+                for (const result of results) {
+                    const nodeData = batch.nodes[result.index], node = nodeData.node, parent = node.parentElement;
+                    if ("success" === result.status && result.translated) {
+                        const decodedTranslation = ImmUtils.decodeHTMLEntities(result.translated), finalText = this.applyTranslationWithPunctuation(nodeData, decodedTranslation);
+                        node.nodeValue = finalText, PageTranslationCore.removeSpinner(parent), PageTranslationCore.removeRetryButton(parent);
+                    } else PageTranslationCore.removeSpinner(parent), PageTranslationCore.addRetryButton(parent, node, this.translationService?.translateText?.bind(this.translationService));
+                    this.updateProgress();
                 }
-                const mid = Math.floor(batch.length / 2);
-                return await this.translateBatchRecursively(batch.slice(0, mid)), void await this.translateBatchRecursively(batch.slice(mid));
+            } catch (error) {
+                await this.processBatchNodesIndividually(batch.nodes);
+            } finally {
+                this.activeBatches.delete(batch.id);
             }
-            let translatedParts = translatedCombined.split(/(?:(?:\|[ \t\r\n]*){0,4}A[ \t\r\n]*I[ \t\r\n]*L[ \t\r\n]*E[ \t\r\n]*N[ \t\r\n]*S(?:[ \t\r\n]*\|){0,4}|(?:\|[ \t\r\n]*){1,3}d?(?:[ \t\r\n]*\|){1,3})/gi);
-            if (translatedParts.length !== batch.length && (translatedParts = translatedParts.filter(((part, index, arr) => 0 === index || ImmUtils.normalize(part) !== ImmUtils.normalize(arr[index - 1])))), 
-            translatedParts.length !== batch.length) {
-                if (1 === batch.length) {
-                    let node = batch[0], parent = node.parentElement;
-                    if (!parent) return;
-                    parent.querySelector(".text-spinner");
-                    try {
-                        let result = await (this.translationService?.translateText(node.nodeValue));
-                        return node.nodeValue = result, PageTranslationCore.removeSpinner(parent), void this.updateProgress();
-                    } catch (err) {
-                        return PageTranslationCore.removeSpinner(parent), void PageTranslationCore.addRetryButton(parent, node, this.translationService?.translateText?.bind(this.translationService));
-                    }
-                }
-                const mid = Math.floor(batch.length / 2);
-                return await this.translateBatchRecursively(batch.slice(0, mid)), void await this.translateBatchRecursively(batch.slice(mid));
-            }
-            for (let i = 0; i < batch.length; i++) {
+        }
+        async processBatchNodesIndividually(nodeDataArray) {
+            for (const nodeData of nodeDataArray) {
                 await ImmUtils.checkPaused();
-                let parent = batch[i].parentElement;
-                PageTranslationCore.removeSpinner(parent), PageTranslationCore.removeRetryButton(parent), 
-                batch[i].nodeValue = ImmUtils.decodeHTMLEntities(translatedParts[i]), this.updateProgress();
+                const node = nodeData.node, parent = node.parentElement;
+                if (parent) {
+                    try {
+                        const result = await this.translationService.translateText(nodeData.cleanText), decodedTranslation = ImmUtils.decodeHTMLEntities(result), finalText = this.applyTranslationWithPunctuation(nodeData, decodedTranslation);
+                        node.nodeValue = finalText, PageTranslationCore.removeSpinner(parent), PageTranslationCore.removeRetryButton(parent);
+                    } catch (err) {
+                        PageTranslationCore.removeSpinner(parent), PageTranslationCore.addRetryButton(parent, node, this.translationService?.translateText?.bind(this.translationService));
+                    }
+                    this.updateProgress();
+                }
             }
         }
         async processIndividualNodes() {
-            for (const node of this.individualNodes) await ImmUtils.checkPaused(), await this.translateSingleNode(node);
+            for (const nodeData of this.individualNodes) await ImmUtils.checkPaused(), await this.translateSingleNodeData(nodeData);
         }
-        async translateSingleNode(node) {
+        async processPunctuationOnlyNodes() {
+            for (const nodeData of this.punctuationOnlyNodes) {
+                const parent = nodeData.node.parentElement;
+                parent && (PageTranslationCore.removeSpinner(parent), PageTranslationCore.removeRetryButton(parent)), 
+                this.updateProgress();
+            }
+        }
+        async translateSingleNodeData(nodeData) {
+            const node = nodeData.node;
             let parent = node.parentElement;
             try {
-                const translated = await (this.translationService?.translateText(node.nodeValue));
-                node.nodeValue = translated, this.updateProgress(), PageTranslationCore.removeSpinner(parent);
+                const translated = await (this.translationService?.translateText(nodeData.cleanText)), finalText = this.applyTranslationWithPunctuation(nodeData, translated);
+                node.nodeValue = finalText, this.updateProgress(), PageTranslationCore.removeSpinner(parent);
             } catch (e) {
                 PageTranslationCore.removeSpinner(parent), PageTranslationCore.addRetryButton(parent, node, this.translationService?.translateText?.bind(this.translationService));
             }
+        }
+        getBatchStats() {
+            return {
+                activeBatches: this.activeBatches.size,
+                activeRequests: this.requestManager.getActiveRequestsCount(),
+                totalNodes: this.total,
+                processedNodes: this.processed,
+                batchNodes: this.batchNodes.length,
+                individualNodes: this.individualNodes.length,
+                punctuationOnlyNodes: this.punctuationOnlyNodes ? this.punctuationOnlyNodes.length : 0
+            };
+        }
+        async cancelAllBatches() {
+            this.requestManager.cancelAllRequests(), this.activeBatches.clear();
+        }
+        getNodeRequestInfo(node) {
+            return this.nodeToRequest.get(node);
+        }
+        logBatchStats() {
+            this.getBatchStats();
         }
     }
     class TranslatorApp {
@@ -1735,16 +1882,16 @@
                 await this.ocrManager.getOcrEngine().initEngine();
                 const promises = [];
                 let processed = 0;
-                return images.forEach(((img, index) => {
-                    "true" !== img.dataset.ocrProcessed && promises.push(Promise.race([ (async () => this.ocrManager.processContent(img).then((() => {
+                return images.forEach((img, index) => {
+                    "true" !== img.dataset.ocrProcessed && promises.push(Promise.race([ (async () => this.ocrManager.processContent(img).then(() => {
                         processed++, this.uiManager.updateFeedback(`Image (${processed}/${total})`);
-                    })).catch((async error => (await ImmUtils.checkPaused(), Promise.resolve()))))(), new Promise(((_, reject) => {
-                        const intervalId = setInterval((async () => {
+                    }).catch(async error => (await ImmUtils.checkPaused(), Promise.resolve())))(), new Promise((_, reject) => {
+                        const intervalId = setInterval(async () => {
                             ImmUtils.isCancelled() && (clearInterval(intervalId), await this.ocrManager.getOcrEngine().terminateEngine(), 
                             reject(new Error("Operation cancelled.")));
-                        }), 50);
-                    })) ]));
-                })), await Promise.all(promises), await this.ocrManager.getOcrEngine().terminateEngine(), 
+                        }, 50);
+                    }) ]));
+                }), await Promise.all(promises), await this.ocrManager.getOcrEngine().terminateEngine(), 
                 0;
             } catch (e) {
                 return BaseUIManager.showNotification(`${e}`, "error"), 1;
@@ -1796,9 +1943,9 @@
             let hasError = !0;
             for (;hasError; ) {
                 hasError = !1;
-                document.querySelectorAll(".ocr-box").forEach((box => {
+                document.querySelectorAll(".ocr-box").forEach(box => {
                     "[[ERROR]]" === JSON.parse(box.getAttribute("data-ocr-info")).translatedText && (hasError = !0);
-                })), await new Promise((resolve => setTimeout(resolve, 5e3)));
+                }), await new Promise(resolve => setTimeout(resolve, 5e3));
             }
             this.translationService.stopWorker();
         }
@@ -1827,11 +1974,9 @@
                 ocrEngine: null
             };
         }
-        setCoreSettings(delimiter = "||d||", batchMaxLength = 1e3, nodeDelimiter = "|||AILENS|||") {
+        setCoreSettings(batchMaxLength = 1e3) {
             return this.options.coreSettings = {
-                delimiter: delimiter,
-                batchMaxLength: batchMaxLength,
-                nodeDelimiter: nodeDelimiter
+                batchMaxLength: batchMaxLength
             }, this;
         }
         setTranslator(translator) {
@@ -1855,6 +2000,10 @@
         build() {
             return this.options;
         }
+    }
+    function resetAll() {
+        download = !1, pdfOCR = !1, translationPaused = !1, translationCanceled = !1, translationActive = !0, 
+        "function" == typeof immTrans?.worker?.terminate && immTrans.worker.terminate();
     }
     const namespace = "undefined" != typeof window ? window : "undefined" != typeof self ? self : globalThis;
     namespace.immTrans = namespace.immTrans || {}, namespace.immTrans.start = async function start(type = "page", downloadValue, pdfOCRValue, options = {}) {
@@ -1896,5 +2045,6 @@
           default:
             throw new Error("Invalid type");
         }
-    };
+        resetAll();
+    }, namespace.immTrans.resetAll = resetAll;
 }();
