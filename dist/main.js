@@ -890,15 +890,19 @@
             const dataAttr = box.getAttribute("data-ocr-info");
             if (!dataAttr) return;
             const data = JSON.parse(dataAttr), translator = trFunc || img.ocrTranslator;
-            translator && (data.translatedText = "", box.setAttribute("data-ocr-info", JSON.stringify(data)), 
-            OCRStrategy.updateBoxesInChunks(img, [ box ]), translator.translateText(data.originalText.replace(/<br>/gi, "[[BR]]")).then(translatedText => {
+            if (!translator) return;
+            let zoomFactor, offsetX, offsetY;
+            data.translatedText = "", zoomFactor = parseFloat(box.dataset?.lastZoomFactor) || 1, 
+            offsetX = parseFloat(box.dataset?.lastOffsetX) || 0, offsetY = parseFloat(box.dataset?.lastOffsetY) || 0, 
+            box.setAttribute("data-ocr-info", JSON.stringify(data)), OCRStrategy.updateBoxesInChunks(img, [ box ], offsetX, offsetY, zoomFactor), 
+            translator.translateText(data.originalText.replace(/<br>/gi, "[[BR]]")).then(translatedText => {
                 const finalText = ImmUtils.decodeHTMLEntities(translatedText).replace(/\[\[BR\]\]/g, "<br>");
                 data.translatedText = finalText, box.setAttribute("data-ocr-info", JSON.stringify(data)), 
-                OCRStrategy.updateBoxesInChunks(img, [ box ]);
+                OCRStrategy.updateBoxesInChunks(img, [ box ], offsetX, offsetY, zoomFactor);
             }).catch(e => {
                 data.translatedText = "[[ERROR]]", box.setAttribute("data-ocr-info", JSON.stringify(data)), 
-                OCRStrategy.updateBoxesInChunks(img, [ box ]);
-            }));
+                OCRStrategy.updateBoxesInChunks(img, [ box ], offsetX, offsetY, zoomFactor);
+            });
         }
         static sampleMedianColor(ctx, x, y, width, height) {
             const data = ctx.getImageData(x, y, width, height).data, rValues = [], gValues = [], bValues = [], aValues = [];
@@ -919,7 +923,7 @@
         static getCtxFromElement(el, corsFreeCanvas = null) {
             return el ? corsFreeCanvas ? corsFreeCanvas.getContext("2d") : "function" == typeof el.getContext ? el.getContext("2d") : null : null;
         }
-        static updateBoxesInChunks(element, boxes, offsetX, offsetY, zoomFactor, corsFreeCanvas, lastTranslatedIndex, translator = null) {
+        static updateBoxesInChunks(element, boxes, offsetX = 0, offsetY = 0, zoomFactor = 1, corsFreeCanvas, lastTranslatedIndex, translator = null) {
             const currTranslator = translator || element.ocrTranslator;
             if (1 === boxes.length) {
                 let b = boxes[0];
@@ -942,10 +946,15 @@
             let currentIndex = 0;
             function updateBox(box, data, boxIndex) {
                 if (!box) return;
-                const html = box.innerHTML.trim(), {bbox: bbox, translatedText: translatedText, baseline: baseline} = data, x = offsetX + bbox.x0 * zoomFactor, y = offsetY + bbox.y0 * zoomFactor, boxWidth = (bbox.x1 - bbox.x0) * zoomFactor, boxHeight = (bbox.y1 - bbox.y0) * zoomFactor;
-                if (requestAnimationFrame(() => {
+                const html = box.innerHTML.trim(), {bbox: bbox, translatedText: translatedText, baseline: baseline} = data;
+                let x, y, boxWidth, boxHeight;
+                if (x = offsetX + bbox.x0 * zoomFactor, y = offsetY + bbox.y0 * zoomFactor, boxWidth = (bbox.x1 - bbox.x0) * zoomFactor, 
+                boxHeight = (bbox.y1 - bbox.y0) * zoomFactor, box.dataset.lastOffsetX = offsetX, 
+                box.dataset.lastOffsetY = offsetY, box.dataset.lastZoomFactor = zoomFactor, requestAnimationFrame(() => {
                     box.style.setProperty("--pos-x", `${x}px`), box.style.setProperty("--pos-y", `${y}px`), 
-                    box.style.setProperty("--box-width", `${boxWidth}px`), box.style.setProperty("--box-height", `${boxHeight}px`);
+                    box.style.setProperty("--box-width", `${boxWidth}px`), box.style.setProperty("--box-height", `${boxHeight}px`), 
+                    box.style.setProperty("--zoom-factor", `${zoomFactor}`), box.style.setProperty("--offset-x", `${offsetX}px`), 
+                    box.style.setProperty("--offset-y", `${offsetY}px`);
                 }), -1 === boxIndex && (html.includes('class="spinner"') || html.includes("ocr-retry-btn"))) return;
                 if (translatedText && "" !== translatedText) if ("[[ERROR]]" === translatedText) {
                     box.querySelectorAll(":scope > .spinner, :scope > .ocr-retry-btn, :scope > .ocr-box-text").forEach(el => el.remove());
@@ -954,7 +963,9 @@
                         e.preventDefault(), e.stopPropagation(), OCRStrategy.retryOcrBoxTranslation(element, box.dataset.index, currTranslator);
                     }), box.appendChild(btn), box.classList.add("ocr-box-error"), box.style.cursor = "pointer", 
                     box.contentEditable = "false";
-                } else {
+                } else if (box.querySelector(":scope > .ocr-box-text")) box.querySelector(":scope > .ocr-box-text").innerHTML = translatedText, 
+                box.querySelectorAll(":scope > .spinner, :scope > .ocr-retry-btn").forEach(el => el.remove()), 
+                box.classList.remove("ocr-box-error"), OCRStrategy.calculateBoxColor(data, element, corsFreeCanvas, bbox, box, parseInt(box.dataset.index)); else {
                     box.querySelectorAll(":scope > .spinner, :scope > .ocr-retry-btn").forEach(el => el.remove());
                     const textEl = document.createElement("div");
                     textEl.className = "ocr-box-text", textEl.innerHTML = translatedText, box.appendChild(textEl), 
@@ -1238,7 +1249,13 @@
             });
         }
         static updateBoxOcrData(box, offsetX, offsetY, zoomFactor, img, canvas = null, color = !1) {
-            const computed = getComputedStyle(box), newLeft = parseFloat(computed.left), newTop = parseFloat(computed.top), newX0 = (newLeft - offsetX) / zoomFactor, newY0 = (newTop - offsetY) / zoomFactor, newX1 = (newLeft - offsetX + parseFloat(computed.width)) / zoomFactor, newY1 = (newTop - offsetY + parseFloat(computed.height)) / zoomFactor, index = parseInt(box.dataset.index, 10), dataStr = box.getAttribute("data-ocr-info");
+            const computed = getComputedStyle(box), newLeft = parseFloat(computed.left), newTop = parseFloat(computed.top), newWidth = parseFloat(computed.width), newHeight = parseFloat(computed.height);
+            box.dataset.hasCustomPosition = "true";
+            const originalOffsetX = parseFloat(computed.getPropertyValue("--offset-x")) || parseFloat(box.dataset.lastOffsetX) || offsetX, originalOffsetY = parseFloat(computed.getPropertyValue("--offset-y")) || parseFloat(box.dataset.lastOffsetY) || offsetY, originalZoomFactor = parseFloat(computed.getPropertyValue("--zoom-factor")) || parseFloat(box.dataset.lastZoomFactor) || zoomFactor, relativeX = (newLeft - originalOffsetX) / originalZoomFactor, relativeY = (newTop - originalOffsetY) / originalZoomFactor, relativeWidth = newWidth / originalZoomFactor, relativeHeight = newHeight / originalZoomFactor;
+            box.dataset.customRelativeX = relativeX, box.dataset.customRelativeY = relativeY, 
+            box.dataset.customRelativeWidth = relativeWidth, box.dataset.customRelativeHeight = relativeHeight, 
+            box.dataset.lastOffsetX = offsetX, box.dataset.lastOffsetY = offsetY, box.dataset.lastZoomFactor = zoomFactor;
+            const newX0 = relativeX, newY0 = relativeY, newX1 = relativeX + relativeWidth, newY1 = relativeY + relativeHeight, index = parseInt(box.dataset.index, 10), dataStr = box.getAttribute("data-ocr-info");
             if (dataStr) {
                 let ocrData = JSON.parse(dataStr);
                 ocrData.bbox = {
@@ -2001,12 +2018,144 @@
             return this.options;
         }
     }
-    function resetAll() {
-        download = !1, pdfOCR = !1, translationPaused = !1, translationCanceled = !1, translationActive = !0, 
-        "function" == typeof immTrans?.worker?.terminate && immTrans.worker.terminate();
+    function addCSS() {
+        const style = document.createElement("style");
+        style.textContent = '\n        @keyframes spin{0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}}@keyframes fadein{from{opacity:0!important;transform:translateY(-15px)}to{opacity:1!important;transform:translateY(0)}}@keyframes fadeout{from{opacity:1}to{opacity:0}}#translationContainer{position:fixed!important;bottom:20px!important;right:20px!important;display:flex!important;flex-direction:row!important;align-items:center!important;gap:8px!important;z-index:10000000!important;transition:transform 0.3s ease-in-out!important;transform-origin:right!important}#translationContainer.hidden{transform:translateX(68%)}#translationFeedbackBox{background:linear-gradient(135deg,rgb(44 62 80 / .95),rgb(52 73 94 / .85))!important;color:#fff!important;padding:16px 24px!important;border-radius:10px!important;font-family:\'Segoe UI\',Tahoma,Geneva,Verdana,sans-serif!important;font-size:16px!important;display:flex!important;max-width:90vw!important;align-items:center!important;box-shadow:0 6px 16px rgb(0 0 0 / .35)!important;backdrop-filter:blur(6px)!important;transition:transform 0.3s ease-in-out!important;transform-origin:right!important}.immTransl-arrow{width:24px;height:24px;cursor:pointer;transition:transform 0.3s ease;margin-right:12px;align-items:center;display:flex}#translationContainer.hidden .immTransl-arrow{transform:rotate(180deg)}#translationFeedbackBox .spinner{width:24px!important;height:24px!important;border:3px solid #fff!important;border-top:3px solid transparent!important;border-radius:50%!important;margin-right:12px!important;animation:spin 1s linear infinite}#notificationContainer{position:fixed!important;bottom:90px!important;right:20px!important;z-index:11000!important;display:flex!important;flex-direction:column!important;gap:10px!important;max-width:90vw!important}.notification{padding:12px 20px!important;border-radius:8px!important;color:#fff!important;font-family:Arial,sans-serif!important;font-size:16px!important;box-shadow:0 4px 12px rgb(0 0 0 / .2)!important;animation:fadein 0.5s ease-out!important}.notification.error{background-color:#e74c3c!important}.notification.warning{background-color:#f1c40f!important;color:#000!important}.notification.success{background-color:#2ecc71!important;color:#000!important}.notification.info{background-color:#3498db!important;color:#fff!important}.fade-out{animation:fadeout 0.5s forwards!important}@media (max-width:600px){#translationFeedbackBox,.notification{font-size:14px!important;padding:10px 16px!important}#translationFeedbackBox .spinner{width:16px!important;height:16px!important;margin-right:8px!important}}#translationControls{margin-left:12px!important;display:flex!important;gap:8px!important}.immTransl-control-btn{width:36px!important;height:36px!important;border:none!important;border-radius:50%!important;cursor:pointer!important;outline:none!important;display:flex!important;align-items:center!important;justify-content:center!important;color:#fff!important;font-size:14px!important;transition:background-color 0.2s ease,transform 0.1s ease!important}.immTransl-control-btn:hover{filter:brightness(1.2)!important}.immTransl-control-btn:active{transform:scale(.95)!important}.immTransl-control-btn.pause{background-color:#f1c40f!important}.immTransl-control-btn.resume{background-color:#2ecc71!important}.immTransl-control-btn.cancel{background-color:#e74c3c!important}.immTransl-control-btn.reset{background:linear-gradient(135deg,rgb(44 62 80 / .95),rgb(52 73 94 / .85))!important;box-shadow:0 6px 16px rgb(0 0 0 / .35)!important;backdrop-filter:blur(6px)!important;transition:background-color 0.3s ease,transform 0.1s ease!important;width:48px!important;height:48px!important}.immTransl-control-btn:disabled{opacity:0.5!important;cursor:not-allowed!important}@media (max-width:600px){#translationFeedbackBox,.notification{font-size:14px!important;padding:10px 16px!important}#translationFeedbackBox .spinner{width:16px!important;height:16px!important;margin-right:8px!important}}.translation-wrapper{position:relative;align-items:center}.text-spinner{display:inline-block;width:1em;height:1em;border:3px solid rgb(0 0 0 / .604);border-top:3px solid #fff0;border-radius:50%;animation:spin 1s linear infinite;margin-left:5px;flex:0 0 auto}.text-retry-button{width:1em;height:1em;background-color:#e53935;color:#fff;border:none;border-radius:4px;padding:10px;display:inline-flex;align-items:center;justify-content:center;font-weight:500;text-transform:uppercase;cursor:pointer;outline:none;box-shadow:0 3px 1px -2px rgb(0 0 0 / .2),0 2px 2px 0 rgb(0 0 0 / .14),0 1px 5px 0 rgb(0 0 0 / .12);transition:box-shadow 0.3s ease,background-color 0.3s ease;position:absolute;cursor:pointer;z-index:1000}.text-retry-button:hover{background-color:#d32f2f;box-shadow:0 5px 5px -3px rgb(0 0 0 / .2),0 8px 10px 1px rgb(0 0 0 / .14),0 3px 14px 2px rgb(0 0 0 / .12)}.text-retry-button:active{background-color:#c62828;box-shadow:0 2px 4px -1px rgb(0 0 0 / .2),0 4px 5px 0 rgb(0 0 0 / .14),0 1px 10px 0 rgb(0 0 0 / .12)}.text-retry-button::after{position:absolute;top:0;left:0;right:0;bottom:0;background:#fff0;z-index:9999}.ocr-overlay{position:absolute!important;color:#fff!important;font-family:\'Helvetica Neue\',Arial,sans-serif!important;text-shadow:0 1px 2px rgb(0 0 0 / .6)!important;padding:4px 8px!important;border-radius:0px!important;display:flex;align-items:center!important;justify-content:center!important;z-index:9999!important;transition:opacity 0.3s ease!important;opacity:0.95!important;overflow:hidden!important;white-space:pre-wrap!important}.ocr-box{position:absolute!important;left:var(--pos-x,0);top:var(--pos-y,0);width:var(--box-width,auto);height:var(--box-height,auto);transition:left 0.05s ease,top 0.05s ease;background:linear-gradient(135deg,rgb(44 62 80 / .95),rgb(52 73 94 / .85));box-shadow:8px 8px 11px rgb(0 0 0 / .1),0 1px 2px rgb(0 0 0 / .1)!important;color:#fff;font-weight:400!important;display:flex;justify-content:center!important;align-items:center!important;flex-direction:column!important;-webkit-overflow-scrolling:touch;-webkit-backdrop-filter:blur(40px)!important;-webkit-hyphens:auto!important;line-height:1.2em!important;box-sizing:border-box!important;word-break:break-word!important;word-wrap:break-word!important;letter-spacing:normal!important;border-radius:8px!important;font-family:\'Helvetica Neue\',Arial,sans-serif!important;text-align:left!important;padding:2px 4px!important;overflow:auto!important;white-space:normal!important;z-index:9999!important}.ocr-box-text{font-size:100%}.ocr-box-text::-webkit-scrollbar{-webkit-appearance:none;width:0;height:0}.ocr-box::-webkit-scrollbar{-webkit-appearance:none;width:0;height:0}.ocr-box.dragging{touch-action:none;-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}#pdf-container.dragging{touch-action:none;-webkit-touch-callout:none;-webkit-user-select:none}.ocr-box.ocr-box-error{background:linear-gradient(135deg,#f8e1e1,#fdf5f5);color:#a94442;box-shadow:0 4px 8px rgb(0 0 0 / .05);border-radius:8px;padding:0;overflow:hidden}.ocr-box.ocr-box-error:hover{transform:scale(1.02);box-shadow:0 8px 16px rgb(0 0 0 / .2)}.ocr-box .spinner{display:inline-block;width:auto;height:1em;aspect-ratio:1;border:3px solid rgb(255 255 255 / .1)!important;border-top:3px solid transparent!important;border-radius:50%!important;margin:auto!important;animation:spin 1s linear infinite}.ocr-box.ocr-box-error .ocr-retry-btn{display:flex;align-items:center;justify-content:center;width:100%;height:100%;background:#f44336;color:#fff;font-size:clamp(6px, 5vw, 24px);font-weight:500;border:none;outline:none;border-radius:4px;cursor:pointer;text-transform:uppercase;letter-spacing:.5px;position:relative;overflow:hidden;transition:background 0.3s,box-shadow 0.3s}.ocr-box.ocr-box-error .ocr-retry-btn:hover{background:#e53935;box-shadow:0 4px 8px rgb(0 0 0 / .3)}.ocr-box.ocr-box-error .ocr-retry-btn:active{background:#d32f2f;box-shadow:0 2px 4px rgb(0 0 0 / .2)}.ocr-box.ocr-box-error .ocr-retry-btn::after{content:"";position:absolute;top:50%;left:50%;width:5px;height:5px;background:rgb(255 255 255 / .5);opacity:0;border-radius:50%;transform:translate(-50%,-50%) scale(1);transition:width 0.6s ease-out,height 0.6s ease-out,opacity 0.6s ease-out}.ocr-box.ocr-box-error .ocr-retry-btn:active::after{width:120%;height:120%;opacity:0;transition:0s}.img-container{position:relative!important;display:inline-block!important}#pdf-viewer{position:relative;width:auto;height:95%;display:flex}#pdf-toolbar{position:fixed;top:10px;left:50%;transform:translateX(-50%);width:90%;max-width:600px;height:55px;background:rgb(44 62 80 / .7);backdrop-filter:blur(10px);border-radius:12px;color:#fff;display:flex;align-items:center;justify-content:space-between;z-index:1000000;box-shadow:0 4px 12px rgb(0 0 0 / .2);padding:0 15px;font-family:\'Segoe UI\',Tahoma,Geneva,Verdana,sans-serif}#pdf-toolbar button{background:rgb(255 255 255 / .2);border:none;color:#fff;padding:10px;margin:0 5px;border-radius:8px;font-size:18px;cursor:pointer;transition:all 0.3s ease-in-out;display:flex;align-items:center;justify-content:center;width:42px;height:42px}#pdf-toolbar button:hover{background:rgb(255 255 255 / .4)}#pdf-toolbar button:disabled{opacity:.5;cursor:not-allowed}#pdf-toolbar button i{font-size:22px}#pdf-toolbar span{font-size:18px;font-weight:700;text-align:center;flex-grow:1;padding:0 10px}.PDFtextLayer span{position:absolute!important}.PDFtextLayer{position:absolute;top:0;left:0;width:100%;height:100%}#pdf-container{margin-top:80px;flex:1;display:flex;flex-direction:column;gap:15px;overflow:visible;position:relative;margin:auto;width:95%}#pdf-container .ocr-container{position:relative;width:100%;box-shadow:0 0 6px rgb(0 0 0 / .2);overflow:hidden}#pdf-container canvas{width:100%!important;height:auto!important;display:block}#pdfOptionsOverlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgb(0 0 0 / .5);display:flex;align-items:center;justify-content:center;z-index:10000;padding:20px;animation:fadeIn 0.3s ease-in-out}@keyframes fadeIn{from{opacity:0}to{opacity:1}}#pdfOptionsModal{background:#f5f5f5;border-radius:8px;padding:20px;width:100%;max-width:400px;box-shadow:0 4px 12px rgb(0 0 0 / .15);font-family:Arial,sans-serif;opacity:0;transform:translateY(20px);animation:slideUp 0.4s forwards}@keyframes slideUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}#pdfOptionsModal h2{margin-top:0;font-size:20px;color:#333;text-align:center;margin-bottom:20px}#pdfOptionsModal form>div{margin-bottom:15px}#pdfOptionsModal label{color:#333;font-size:14px;margin-left:8px}#pdfOptionsModal input[type="text"],#pdfOptionsModal input[type="number"]{width:calc(100% - 20px);padding:10px;margin-top:8px;border:1px solid #ccc;border-radius:4px;font-size:14px;transition:border-color 0.3s ease,box-shadow 0.3s ease}#pdfOptionsModal input[type="text"]:focus,#pdfOptionsModal input[type="number"]:focus{outline:none;border-color:#333;box-shadow:0 0 5px rgb(51 51 51 / .3)}#pdfOptionsModal input[type="radio"]{transform:scale(1.2);vertical-align:middle;margin-right:8px}#pdfOptionsModal .quality-container{display:flex;align-items:center;justify-content:center;gap:8px}#pdfOptionsModal .quality-container label{font-size:14px;color:#333}#pdfOptionsModal .quality-container input[type="range"]{flex:1;margin:0}#pdfOptionsModal .quality-container span{width:40px;text-align:center;font-size:14px;color:#333}#pdfOptionsModal input[type="range"]{-webkit-appearance:none;width:100%;height:6px;border-radius:3px;background:#ddd;outline:none;transition:background 0.3s}#pdfOptionsModal input[type="range"]::-webkit-slider-runnable-track{width:100%;height:6px;cursor:pointer;background:#ddd;border-radius:3px}#pdfOptionsModal input[type="range"]::-webkit-slider-thumb{-webkit-appearance:none;width:20px;height:20px;border-radius:50%;background:#333;cursor:pointer;transition:background 0.3s,transform 0.2s;margin-top:-7px}#pdfOptionsModal input[type="range"]::-webkit-slider-thumb:hover{background:#555;transform:scale(1.1)}@media (max-width:480px){#pdfOptionsModal .quality-container{flex-direction:column;align-items:center}#pdfOptionsModal .quality-container input[type="range"]{width:100%;margin:8px 0}#pdfOptionsModal .quality-container span{text-align:center}}#pdfOptionsModal .button-group{display:flex;justify-content:flex-end;gap:10px;margin-top:20px}#pdfOptionsModal button{padding:10px 18px;font-size:14px;border:none;border-radius:4px;cursor:pointer;transition:background-color 0.3s ease,transform 0.2s ease}#pdfOptionsModal button#cancelPdfOptions{background:#ccc;color:#fff}#pdfOptionsModal button#cancelPdfOptions:hover{background:#b3b3b3;transform:scale(1.02)}#pdfOptionsModal button#confirmPdfOptions{background:#333;color:#fff}#pdfOptionsModal button#confirmPdfOptions:hover{background:#1a1a1a;transform:scale(1.02)}@media (max-width:480px){#pdfOptionsModal{padding:15px;max-width:90%}#pdfOptionsModal h2{font-size:18px}#pdfOptionsModal button{padding:10px;font-size:16px}#pdfOptionsModal button#confirmPdfOptions{flex:auto}}@media (max-width:600px){#pdf-toolbar{width:95%;max-width:95%;height:60px;padding:0 10px}#pdf-toolbar button{width:44px;height:44px}#pdf-toolbar button i{font-size:20px}#pdf-toolbar span{font-size:16px}#pdf-viewer{margin-top:90px}#pdf-toolbar #pageIndicator,#pdf-toolbar #zoomIndicator{font-size:14px}}@media (max-width:480px){.ocr-box{padding:1px 2px!important;border-radius:4px!important}.ocr-overlay{padding:2px 4px!important}}\n        ', 
+        document.head.appendChild(style);
     }
-    const namespace = "undefined" != typeof window ? window : "undefined" != typeof self ? self : globalThis;
-    namespace.immTrans = namespace.immTrans || {}, namespace.immTrans.start = async function start(type = "page", downloadValue, pdfOCRValue, options = {}) {
+    class ImmersiveTranslatorCore {
+        constructor(config = {}) {
+            this.config = this.mergeDefaultConfig(config), this.app = null, this.initialized = !1, 
+            this.worker = null;
+        }
+        mergeDefaultConfig(userConfig) {
+            return this.deepMerge({
+                translator: "ChatGPT",
+                translatorOptions: {
+                    apiKey: "",
+                    model: "gpt-3.5-turbo",
+                    temperature: .3,
+                    targetLang: "it",
+                    prompt: "Traduci il seguente testo in italiano, mantieni la formattazione:",
+                    openAiUrl: "https://api.openai.com/v1/chat/completions"
+                },
+                queueDelay: 1e3,
+                ocrLanguages: "eng",
+                coreSettings: {
+                    batchMaxLength: 1e3
+                },
+                ui: {
+                    enabled: !0,
+                    autoCSS: !0,
+                    notifications: !0
+                },
+                download: !1,
+                pdfOCR: !1
+            }, userConfig);
+        }
+        deepMerge(target, source) {
+            const result = {
+                ...target
+            };
+            for (const key in source) source[key] && "object" == typeof source[key] && !Array.isArray(source[key]) ? result[key] = this.deepMerge(target[key] || {}, source[key]) : result[key] = source[key];
+            return result;
+        }
+        async init() {
+            if (this.initialized) return this;
+            try {
+                this.worker || await this.initWorker(), download = this.config.download, pdfOCR = this.config.pdfOCR, 
+                this.config.ui.autoCSS && addCSS();
+                let options = (new OptionsBuilder).setCoreSettings(this.config.coreSettings.batchMaxLength).setTranslator(this.config.translator).setTranslatorOptions(this.config.translatorOptions).setQueueDelay(this.config.queueDelay).setOCREngine(this.config.ocrLanguages).build();
+                return options = await initConfig(options), this.app = new TranslatorApp({
+                    translator: options.translator,
+                    translatorOptions: options.translatorOptions,
+                    queueDelay: options.queueDelay,
+                    ocrWorker: options.ocrEngine,
+                    uiType: "page",
+                    coreSettings: options.coreSettings,
+                    worker: this.worker
+                }), this.initialized = !0, this;
+            } catch (error) {
+                throw error;
+            }
+        }
+        async initWorker() {
+            "undefined" != typeof immTrans && immTrans.worker && (this.worker = immTrans?.worker, 
+            await immTrans.ready);
+        }
+        async translatePage(options = {}) {
+            if (await this.init(), !this.app) throw new Error("App non inizializzata");
+            this.app.uiType = "page";
+            const result = await Promise.all([ this.app.translatePage(), this.app.translateImages() ]);
+            return this.config.ui.enabled && (this.app.uiManager.updateFeedback("Done!", !1), 
+            this.app.stop(5e3)), result;
+        }
+        async translateImages(options = {}) {
+            if (await this.init(), !this.app) throw new Error("App non inizializzata");
+            this.app.uiType = "image";
+            const result = await this.app.translateImages();
+            return this.config.ui.enabled && (this.app.uiManager.updateFeedback("Done!", !1), 
+            this.app.stop(5e3)), result;
+        }
+        async translateLocalImages(options = {}) {
+            if (await this.init(), !this.app) throw new Error("App non inizializzata");
+            this.app.uiType = "local";
+            const result = await this.app.translateLocalImages();
+            return this.config.ui.enabled && (this.app.uiManager.updateFeedback("Done!", !1), 
+            this.app.stop(5e3)), result;
+        }
+        async translatePDF(pdfData = null, options = {}) {
+            if (await this.init(), !this.app) throw new Error("App non inizializzata");
+            pdfData && ("string" == typeof pdfData ? window.base64Data = pdfData : pdfData instanceof File || pdfData instanceof Blob ? window.base64Data = await this.blobToBase64(pdfData) : pdfData instanceof ArrayBuffer && (window.base64Data = this.arrayBufferToBase64(pdfData))), 
+            this.app.uiType = "pdf";
+            const result = await this.app.translatePdf();
+            return this.config.ui.enabled && this.app.stop(5e3), result;
+        }
+        async translateText(text, options = {}) {
+            if (await this.init(), !this.app || !this.app.core) throw new Error("App non inizializzata");
+            return await this.app.core.translationService.translateText(text);
+        }
+        async translateBatch(texts, options = {}) {
+            if (await this.init(), !this.app || !this.app.core) throw new Error("App non inizializzata");
+            const batchPayload = {
+                batchId: `manual_batch_${Date.now()}`,
+                items: texts.map((text, index) => ({
+                    id: `item_${index}`,
+                    index: index,
+                    content: text
+                }))
+            };
+            return await this.app.core.translationService.translateBatch(batchPayload);
+        }
+        async stop() {
+            this.app && await this.app.stop(), this.reset();
+        }
+        reset() {
+            this.initialized = !1, this.app = null, resetAll();
+        }
+        async blobToBase64(blob) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader;
+                reader.onloadend = () => resolve(reader.result.split(",")[1]), reader.onerror = reject, 
+                reader.readAsDataURL(blob);
+            });
+        }
+        arrayBufferToBase64(arrayBuffer) {
+            const bytes = new Uint8Array(arrayBuffer);
+            let binary = "";
+            for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]);
+            return btoa(binary);
+        }
+        updateConfig(newConfig) {
+            this.config = this.deepMerge(this.config, newConfig), this.initialized;
+        }
+        getConfig() {
+            return {
+                ...this.config
+            };
+        }
+    }
+    async function start(type = "page", downloadValue, pdfOCRValue, options = {}) {
         download = downloadValue, pdfOCR = pdfOCRValue;
         let o = (new OptionsBuilder).setCoreSettings().setTranslator(options?.translator).setTranslatorOptions(options?.translatorOptions).setQueueDelay(options?.queueDelay).setOCREngine(options?.ocrLanguages).build();
         try {
@@ -2026,11 +2175,7 @@
         });
         switch (type) {
           case "page":
-            !function addCSS() {
-                const style = document.createElement("style");
-                style.textContent = '\n        @keyframes spin{0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}}@keyframes fadein{from{opacity:0!important;transform:translateY(-15px)}to{opacity:1!important;transform:translateY(0)}}@keyframes fadeout{from{opacity:1}to{opacity:0}}#translationContainer{position:fixed!important;bottom:20px!important;right:20px!important;display:flex!important;flex-direction:row!important;align-items:center!important;gap:8px!important;z-index:10000000!important;transition:transform 0.3s ease-in-out!important;transform-origin:right!important}#translationContainer.hidden{transform:translateX(68%)}#translationFeedbackBox{background:linear-gradient(135deg,rgb(44 62 80 / .95),rgb(52 73 94 / .85))!important;color:#fff!important;padding:16px 24px!important;border-radius:10px!important;font-family:\'Segoe UI\',Tahoma,Geneva,Verdana,sans-serif!important;font-size:16px!important;display:flex!important;max-width:90vw!important;align-items:center!important;box-shadow:0 6px 16px rgb(0 0 0 / .35)!important;backdrop-filter:blur(6px)!important;transition:transform 0.3s ease-in-out!important;transform-origin:right!important}.immTransl-arrow{width:24px;height:24px;cursor:pointer;transition:transform 0.3s ease;margin-right:12px;align-items:center;display:flex}#translationContainer.hidden .immTransl-arrow{transform:rotate(180deg)}#translationFeedbackBox .spinner{width:24px!important;height:24px!important;border:3px solid #fff!important;border-top:3px solid transparent!important;border-radius:50%!important;margin-right:12px!important;animation:spin 1s linear infinite}#notificationContainer{position:fixed!important;bottom:90px!important;right:20px!important;z-index:11000!important;display:flex!important;flex-direction:column!important;gap:10px!important;max-width:90vw!important}.notification{padding:12px 20px!important;border-radius:8px!important;color:#fff!important;font-family:Arial,sans-serif!important;font-size:16px!important;box-shadow:0 4px 12px rgb(0 0 0 / .2)!important;animation:fadein 0.5s ease-out!important}.notification.error{background-color:#e74c3c!important}.notification.warning{background-color:#f1c40f!important;color:#000!important}.notification.success{background-color:#2ecc71!important;color:#000!important}.notification.info{background-color:#3498db!important;color:#fff!important}.fade-out{animation:fadeout 0.5s forwards!important}@media (max-width:600px){#translationFeedbackBox,.notification{font-size:14px!important;padding:10px 16px!important}#translationFeedbackBox .spinner{width:16px!important;height:16px!important;margin-right:8px!important}}#translationControls{margin-left:12px!important;display:flex!important;gap:8px!important}.immTransl-control-btn{width:36px!important;height:36px!important;border:none!important;border-radius:50%!important;cursor:pointer!important;outline:none!important;display:flex!important;align-items:center!important;justify-content:center!important;color:#fff!important;font-size:14px!important;transition:background-color 0.2s ease,transform 0.1s ease!important}.immTransl-control-btn:hover{filter:brightness(1.2)!important}.immTransl-control-btn:active{transform:scale(.95)!important}.immTransl-control-btn.pause{background-color:#f1c40f!important}.immTransl-control-btn.resume{background-color:#2ecc71!important}.immTransl-control-btn.cancel{background-color:#e74c3c!important}.immTransl-control-btn.reset{background:linear-gradient(135deg,rgb(44 62 80 / .95),rgb(52 73 94 / .85))!important;box-shadow:0 6px 16px rgb(0 0 0 / .35)!important;backdrop-filter:blur(6px)!important;transition:background-color 0.3s ease,transform 0.1s ease!important;width:48px!important;height:48px!important}.immTransl-control-btn:disabled{opacity:0.5!important;cursor:not-allowed!important}@media (max-width:600px){#translationFeedbackBox,.notification{font-size:14px!important;padding:10px 16px!important}#translationFeedbackBox .spinner{width:16px!important;height:16px!important;margin-right:8px!important}}.translation-wrapper{position:relative;align-items:center}.text-spinner{display:inline-block;width:1em;height:1em;border:3px solid rgb(0 0 0 / .604);border-top:3px solid #fff0;border-radius:50%;animation:spin 1s linear infinite;margin-left:5px;flex:0 0 auto}.text-retry-button{width:1em;height:1em;background-color:#e53935;color:#fff;border:none;border-radius:4px;padding:10px;display:inline-flex;align-items:center;justify-content:center;font-weight:500;text-transform:uppercase;cursor:pointer;outline:none;box-shadow:0 3px 1px -2px rgb(0 0 0 / .2),0 2px 2px 0 rgb(0 0 0 / .14),0 1px 5px 0 rgb(0 0 0 / .12);transition:box-shadow 0.3s ease,background-color 0.3s ease;position:absolute;cursor:pointer;z-index:1000}.text-retry-button:hover{background-color:#d32f2f;box-shadow:0 5px 5px -3px rgb(0 0 0 / .2),0 8px 10px 1px rgb(0 0 0 / .14),0 3px 14px 2px rgb(0 0 0 / .12)}.text-retry-button:active{background-color:#c62828;box-shadow:0 2px 4px -1px rgb(0 0 0 / .2),0 4px 5px 0 rgb(0 0 0 / .14),0 1px 10px 0 rgb(0 0 0 / .12)}.text-retry-button::after{position:absolute;top:0;left:0;right:0;bottom:0;background:#fff0;z-index:9999}.ocr-overlay{position:absolute!important;color:#fff!important;font-family:\'Helvetica Neue\',Arial,sans-serif!important;text-shadow:0 1px 2px rgb(0 0 0 / .6)!important;padding:4px 8px!important;border-radius:0px!important;display:flex;align-items:center!important;justify-content:center!important;z-index:9999!important;transition:opacity 0.3s ease!important;opacity:0.95!important;overflow:hidden!important;white-space:pre-wrap!important}.ocr-box{position:absolute!important;left:var(--pos-x,0);top:var(--pos-y,0);width:var(--box-width,auto);height:var(--box-height,auto);transition:left 0.05s ease,top 0.05s ease;background:linear-gradient(135deg,rgb(44 62 80 / .95),rgb(52 73 94 / .85));box-shadow:8px 8px 11px rgb(0 0 0 / .1),0 1px 2px rgb(0 0 0 / .1)!important;color:#fff;font-weight:400!important;display:flex;justify-content:center!important;align-items:center!important;flex-direction:column!important;-webkit-overflow-scrolling:touch;-webkit-backdrop-filter:blur(40px)!important;-webkit-hyphens:auto!important;line-height:1.2em!important;box-sizing:border-box!important;word-break:break-word!important;word-wrap:break-word!important;letter-spacing:normal!important;border-radius:8px!important;font-family:\'Helvetica Neue\',Arial,sans-serif!important;text-align:left!important;padding:2px 4px!important;overflow:auto!important;white-space:normal!important;z-index:9999!important}.ocr-box-text{font-size:100%}.ocr-box-text::-webkit-scrollbar{-webkit-appearance:none;width:0;height:0}.ocr-box::-webkit-scrollbar{-webkit-appearance:none;width:0;height:0}.ocr-box.dragging{touch-action:none;-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}#pdf-container.dragging{touch-action:none;-webkit-touch-callout:none;-webkit-user-select:none}.ocr-box.ocr-box-error{background:linear-gradient(135deg,#f8e1e1,#fdf5f5);color:#a94442;box-shadow:0 4px 8px rgb(0 0 0 / .05);border-radius:8px;padding:0;overflow:hidden}.ocr-box.ocr-box-error:hover{transform:scale(1.02);box-shadow:0 8px 16px rgb(0 0 0 / .2)}.ocr-box .spinner{display:inline-block;width:auto;height:1em;aspect-ratio:1;border:3px solid rgb(255 255 255 / .1)!important;border-top:3px solid transparent!important;border-radius:50%!important;margin:auto!important;animation:spin 1s linear infinite}.ocr-box.ocr-box-error .ocr-retry-btn{display:flex;align-items:center;justify-content:center;width:100%;height:100%;background:#f44336;color:#fff;font-size:clamp(6px, 5vw, 24px);font-weight:500;border:none;outline:none;border-radius:4px;cursor:pointer;text-transform:uppercase;letter-spacing:.5px;position:relative;overflow:hidden;transition:background 0.3s,box-shadow 0.3s}.ocr-box.ocr-box-error .ocr-retry-btn:hover{background:#e53935;box-shadow:0 4px 8px rgb(0 0 0 / .3)}.ocr-box.ocr-box-error .ocr-retry-btn:active{background:#d32f2f;box-shadow:0 2px 4px rgb(0 0 0 / .2)}.ocr-box.ocr-box-error .ocr-retry-btn::after{content:"";position:absolute;top:50%;left:50%;width:5px;height:5px;background:rgb(255 255 255 / .5);opacity:0;border-radius:50%;transform:translate(-50%,-50%) scale(1);transition:width 0.6s ease-out,height 0.6s ease-out,opacity 0.6s ease-out}.ocr-box.ocr-box-error .ocr-retry-btn:active::after{width:120%;height:120%;opacity:0;transition:0s}.img-container{position:relative!important;display:inline-block!important}#pdf-viewer{position:relative;width:auto;height:95%;display:flex}#pdf-toolbar{position:fixed;top:10px;left:50%;transform:translateX(-50%);width:90%;max-width:600px;height:55px;background:rgb(44 62 80 / .7);backdrop-filter:blur(10px);border-radius:12px;color:#fff;display:flex;align-items:center;justify-content:space-between;z-index:1000000;box-shadow:0 4px 12px rgb(0 0 0 / .2);padding:0 15px;font-family:\'Segoe UI\',Tahoma,Geneva,Verdana,sans-serif}#pdf-toolbar button{background:rgb(255 255 255 / .2);border:none;color:#fff;padding:10px;margin:0 5px;border-radius:8px;font-size:18px;cursor:pointer;transition:all 0.3s ease-in-out;display:flex;align-items:center;justify-content:center;width:42px;height:42px}#pdf-toolbar button:hover{background:rgb(255 255 255 / .4)}#pdf-toolbar button:disabled{opacity:.5;cursor:not-allowed}#pdf-toolbar button i{font-size:22px}#pdf-toolbar span{font-size:18px;font-weight:700;text-align:center;flex-grow:1;padding:0 10px}.PDFtextLayer span{position:absolute!important}.PDFtextLayer{position:absolute;top:0;left:0;width:100%;height:100%}#pdf-container{margin-top:80px;flex:1;display:flex;flex-direction:column;gap:15px;overflow:visible;position:relative;margin:auto;width:95%}#pdf-container .ocr-container{position:relative;width:100%;box-shadow:0 0 6px rgb(0 0 0 / .2);overflow:hidden}#pdf-container canvas{width:100%!important;height:auto!important;display:block}#pdfOptionsOverlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgb(0 0 0 / .5);display:flex;align-items:center;justify-content:center;z-index:10000;padding:20px;animation:fadeIn 0.3s ease-in-out}@keyframes fadeIn{from{opacity:0}to{opacity:1}}#pdfOptionsModal{background:#f5f5f5;border-radius:8px;padding:20px;width:100%;max-width:400px;box-shadow:0 4px 12px rgb(0 0 0 / .15);font-family:Arial,sans-serif;opacity:0;transform:translateY(20px);animation:slideUp 0.4s forwards}@keyframes slideUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}#pdfOptionsModal h2{margin-top:0;font-size:20px;color:#333;text-align:center;margin-bottom:20px}#pdfOptionsModal form>div{margin-bottom:15px}#pdfOptionsModal label{color:#333;font-size:14px;margin-left:8px}#pdfOptionsModal input[type="text"],#pdfOptionsModal input[type="number"]{width:calc(100% - 20px);padding:10px;margin-top:8px;border:1px solid #ccc;border-radius:4px;font-size:14px;transition:border-color 0.3s ease,box-shadow 0.3s ease}#pdfOptionsModal input[type="text"]:focus,#pdfOptionsModal input[type="number"]:focus{outline:none;border-color:#333;box-shadow:0 0 5px rgb(51 51 51 / .3)}#pdfOptionsModal input[type="radio"]{transform:scale(1.2);vertical-align:middle;margin-right:8px}#pdfOptionsModal .quality-container{display:flex;align-items:center;justify-content:center;gap:8px}#pdfOptionsModal .quality-container label{font-size:14px;color:#333}#pdfOptionsModal .quality-container input[type="range"]{flex:1;margin:0}#pdfOptionsModal .quality-container span{width:40px;text-align:center;font-size:14px;color:#333}#pdfOptionsModal input[type="range"]{-webkit-appearance:none;width:100%;height:6px;border-radius:3px;background:#ddd;outline:none;transition:background 0.3s}#pdfOptionsModal input[type="range"]::-webkit-slider-runnable-track{width:100%;height:6px;cursor:pointer;background:#ddd;border-radius:3px}#pdfOptionsModal input[type="range"]::-webkit-slider-thumb{-webkit-appearance:none;width:20px;height:20px;border-radius:50%;background:#333;cursor:pointer;transition:background 0.3s,transform 0.2s;margin-top:-7px}#pdfOptionsModal input[type="range"]::-webkit-slider-thumb:hover{background:#555;transform:scale(1.1)}@media (max-width:480px){#pdfOptionsModal .quality-container{flex-direction:column;align-items:center}#pdfOptionsModal .quality-container input[type="range"]{width:100%;margin:8px 0}#pdfOptionsModal .quality-container span{text-align:center}}#pdfOptionsModal .button-group{display:flex;justify-content:flex-end;gap:10px;margin-top:20px}#pdfOptionsModal button{padding:10px 18px;font-size:14px;border:none;border-radius:4px;cursor:pointer;transition:background-color 0.3s ease,transform 0.2s ease}#pdfOptionsModal button#cancelPdfOptions{background:#ccc;color:#fff}#pdfOptionsModal button#cancelPdfOptions:hover{background:#b3b3b3;transform:scale(1.02)}#pdfOptionsModal button#confirmPdfOptions{background:#333;color:#fff}#pdfOptionsModal button#confirmPdfOptions:hover{background:#1a1a1a;transform:scale(1.02)}@media (max-width:480px){#pdfOptionsModal{padding:15px;max-width:90%}#pdfOptionsModal h2{font-size:18px}#pdfOptionsModal button{padding:10px;font-size:16px}#pdfOptionsModal button#confirmPdfOptions{flex:auto}}@media (max-width:600px){#pdf-toolbar{width:95%;max-width:95%;height:60px;padding:0 10px}#pdf-toolbar button{width:44px;height:44px}#pdf-toolbar button i{font-size:20px}#pdf-toolbar span{font-size:16px}#pdf-viewer{margin-top:90px}#pdf-toolbar #pageIndicator,#pdf-toolbar #zoomIndicator{font-size:14px}}@media (max-width:480px){.ocr-box{padding:1px 2px!important;border-radius:4px!important}.ocr-overlay{padding:2px 4px!important}}\n        ', 
-                document.head.appendChild(style);
-            }(), await Promise.all([ app.translatePage(), app.translateImages() ]), app.uiManager.updateFeedback("Done!", !1), 
+            addCSS(), await Promise.all([ app.translatePage(), app.translateImages() ]), app.uiManager.updateFeedback("Done!", !1), 
             app.stop(5e3);
             break;
 
@@ -2046,5 +2191,74 @@
             throw new Error("Invalid type");
         }
         resetAll();
-    }, namespace.immTrans.resetAll = resetAll;
+    }
+    function resetAll() {
+        download = !1, pdfOCR = !1, translationPaused = !1, translationCanceled = !1, translationActive = !0, 
+        "function" == typeof immTrans?.worker?.terminate && immTrans.worker.terminate();
+    }
+    window.ImmersiveTranslator = {
+        Core: ImmersiveTranslatorCore,
+        create: (config = {}) => new ImmersiveTranslatorCore(config),
+        async quickStart(type = "page", config = {}) {
+            const core = new ImmersiveTranslatorCore(config);
+            switch (await core.init(), type) {
+              case "page":
+                return await core.translatePage();
+
+              case "image":
+              case "images":
+                return await core.translateImages();
+
+              case "local":
+                return await core.translateLocalImages();
+
+              case "pdf":
+                return await core.translatePDF();
+
+              default:
+                throw new Error(`Tipo non supportato: ${type}`);
+            }
+        },
+        async translateText(text, config = {}) {
+            const core = new ImmersiveTranslatorCore(config);
+            return await core.translateText(text);
+        },
+        async translateBatch(texts, config = {}) {
+            const core = new ImmersiveTranslatorCore(config);
+            return await core.translateBatch(texts);
+        },
+        presets: {
+            minimal: {
+                ui: {
+                    enabled: !1,
+                    autoCSS: !1,
+                    notifications: !1
+                }
+            },
+            silent: {
+                ui: {
+                    enabled: !1,
+                    autoCSS: !1,
+                    notifications: !1
+                },
+                queueDelay: 0
+            },
+            development: {
+                translator: "Google",
+                translatorOptions: {
+                    model: "",
+                    temperature: 0
+                }
+            }
+        },
+        withPreset: (presetName, additionalConfig = {}) => {
+            const preset = window.ImmersiveTranslator.presets[presetName];
+            if (!preset) throw new Error(`Preset non trovato: ${presetName}`);
+            return (new ImmersiveTranslatorCore).deepMerge(preset, additionalConfig);
+        },
+        legacyStart: async (type, download, pdfOCR, options) => await start(type, download, pdfOCR, options)
+    };
+    const namespace = "undefined" != typeof window ? window : "undefined" != typeof self ? self : globalThis;
+    namespace.immTrans = namespace.immTrans || {}, namespace.immTrans.start = start, 
+    namespace.immTrans.resetAll = resetAll;
 }();
