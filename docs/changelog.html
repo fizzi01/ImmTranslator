@@ -463,6 +463,11 @@
         const API_URL = 'https://api.github.com/repos/fizzi01/ImmTranslator/releases';
         let allReleases = [];
         
+        // Load releases on page startup
+        document.addEventListener('DOMContentLoaded', async function() {
+            await loadReleases();
+        });
+        
         async function loadReleases() {
             const contentDiv = document.getElementById('content');
             const statsDiv = document.getElementById('stats');
