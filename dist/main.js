@@ -413,12 +413,12 @@
             this.worker.postMessage({
                 action: "init",
                 config: {
-                    apiKey: this.translator.apiKey,
-                    openAiUrl: this.translator.openAiUrl,
-                    model: this.translator.model,
-                    temperature: this.translator.temperature,
-                    targetLang: this.translator.targetLang,
-                    prompt: this.translator.prompt,
+                    apiKey: this.translator?.apiKey,
+                    openAiUrl: this.translator?.openAiUrl,
+                    model: this.translator?.model,
+                    temperature: this.translator?.temperature,
+                    targetLang: this.translator?.targetLang,
+                    prompt: this.translator?.prompt,
                     type: this.type,
                     callDelay: this.queueDelay
                 }
@@ -618,6 +618,13 @@
         initUI() {
             this.created || (super.initUI(), this.addCSS());
         }
+    }
+    class HiddenUIManager extends BaseUIManager {
+        constructor() {
+            super();
+        }
+        initUI() {}
+        removeUI() {}
     }
     class PDFUIManager extends BaseUIManager {
         constructor() {
@@ -850,6 +857,9 @@
 
               case "page":
                 return new PageUIManager;
+
+              case "hidden":
+                return new HiddenUIManager;
 
               default:
                 return new BaseUIManager;
@@ -2181,7 +2191,8 @@
     }
     async function start(type = "page", downloadValue, pdfOCRValue, options = {}) {
         download = downloadValue, pdfOCR = pdfOCRValue;
-        let o = (new OptionsBuilder).setCoreSettings().setTranslator(options?.translator).setTranslatorOptions(options?.translatorOptions).setQueueDelay(options?.queueDelay).setOCREngine(options?.ocrLanguages).build();
+        let o = (new OptionsBuilder).setCoreSettings().setTranslator(options?.translator).setTranslatorOptions(options?.translatorOptions).setQueueDelay(options?.queueDelay);
+        "hidden" !== type && o.setOCREngine(options?.ocrLanguages), o = o.build();
         try {
             o = await initConfig(o);
         } catch (e) {
@@ -2209,6 +2220,10 @@
 
           case "pdf":
             await app.translatePdf(), app.stop(5e3);
+            break;
+
+          case "hidden":
+            await app.translatePage(), app.stop(5e3);
             break;
 
           default:

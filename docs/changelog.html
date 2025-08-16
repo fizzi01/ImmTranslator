@@ -4,7 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Immersive Translator - Changelog</title>
-    <script src="https://cdn.jsdelivr.net/gh/fizzi01/ImmTranslator/main.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/gh/fizzi01/ImmTranslator@0.3/dist/main.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/gh/fizzi01/ImmTranslator@0.3/dist/translationWorker.min.js"></script>
     <style>
         /* Import Material Design variables from main.css */
         :root {
@@ -461,11 +462,6 @@
     <script>
         const API_URL = 'https://api.github.com/repos/fizzi01/ImmTranslator/releases';
         let allReleases = [];
-        
-        // Load releases on page startup
-        document.addEventListener('DOMContentLoaded', function() {
-            loadReleases();
-        });
         
         async function loadReleases() {
             const contentDiv = document.getElementById('content');
