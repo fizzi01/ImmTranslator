@@ -1,0 +1,599 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ImmTranslator - Changelog</title>
+    <style>
+        /* Import Material Design variables from main.css */
+        :root {
+            /* Primary Colors - Based on #76C8DB */
+            --md-primary-50: #e8f6f9;
+            --md-primary-100: #c6e9f0;
+            --md-primary-200: #9fdae6;
+            --md-primary-300: #76c8db;
+            --md-primary-400: #58bbd4;
+            --md-primary-500: #3aaecd;
+            --md-primary-600: #349bc3;
+            --md-primary-700: #2d85b5;
+            --md-primary-800: #2770a7;
+            --md-primary-900: #1c4e8f;
+
+            /* Secondary Colors - Complementary warm coral */
+            --md-secondary-50: #fdf2f0;
+            --md-secondary-100: #faddd7;
+            --md-secondary-200: #f7c5bb;
+            --md-secondary-300: #f3ac9f;
+            --md-secondary-400: #f0988a;
+            --md-secondary-500: #ed8575;
+            --md-secondary-600: #eb7d6d;
+            --md-secondary-700: #e87262;
+            --md-secondary-800: #e56858;
+            --md-secondary-900: #e05645;
+
+            /* Surface Colors - Cool grays with teal undertones */
+            --md-surface-50: #f8fafb;
+            --md-surface-100: #f1f5f7;
+            --md-surface-200: #e8eff2;
+            --md-surface-300: #d8e3e8;
+            --md-surface-400: #b8c9d1;
+            --md-surface-500: #94a8b3;
+            --md-surface-600: #718590;
+            --md-surface-700: #5a6b75;
+            --md-surface-800: #42505a;
+            --md-surface-900: #2a3439;
+
+            /* Success, Warning, Error Colors */
+            --md-success-50: #f0faf4;
+            --md-success-100: #dcf4e6;
+            --md-success-500: #22c55e;
+            --md-success-700: #15803d;
+
+            --md-warning-50: #fffbeb;
+            --md-warning-100: #fef3c7;
+            --md-warning-500: #f59e0b;
+            --md-warning-700: #d97706;
+
+            --md-error-50: #fef2f2;
+            --md-error-100: #fee2e2;
+            --md-error-500: #ef4444;
+            --md-error-700: #dc2626;
+
+            /* Shadows */
+            --md-shadow-1: 0px 2px 1px -1px rgba(0,0,0,0.2), 0px 1px 1px 0px rgba(0,0,0,0.14), 0px 1px 3px 0px rgba(0,0,0,0.12);
+            --md-shadow-2: 0px 3px 1px -2px rgba(0,0,0,0.2), 0px 2px 2px 0px rgba(0,0,0,0.14), 0px 1px 5px 0px rgba(0,0,0,0.12);
+            --md-shadow-3: 0px 3px 3px -2px rgba(0,0,0,0.2), 0px 3px 4px 0px rgba(0,0,0,0.14), 0px 1px 8px 0px rgba(0,0,0,0.12);
+            --md-shadow-4: 0px 2px 4px -1px rgba(0,0,0,0.2), 0px 4px 5px 0px rgba(0,0,0,0.14), 0px 1px 10px 0px rgba(0,0,0,0.12);
+            --md-shadow-6: 0px 3px 5px -1px rgba(0,0,0,0.2), 0px 6px 10px 0px rgba(0,0,0,0.14), 0px 1px 18px 0px rgba(0,0,0,0.12);
+            --md-shadow-8: 0px 5px 5px -3px rgba(0,0,0,0.2), 0px 8px 10px 1px rgba(0,0,0,0.14), 0px 3px 14px 2px rgba(0,0,0,0.12);
+
+            /* Typography */
+            --md-font-family: 'Roboto', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            --md-font-weight-light: 300;
+            --md-font-weight-regular: 400;
+            --md-font-weight-medium: 500;
+            --md-font-weight-bold: 700;
+
+            /* Border Radius */
+            --md-border-radius-small: 4px;
+            --md-border-radius-medium: 8px;
+            --md-border-radius-large: 12px;
+            --md-border-radius-extra-large: 16px;
+
+            /* Transitions */
+            --md-transition-duration-short: 150ms;
+            --md-transition-duration-medium: 250ms;
+            --md-transition-duration-long: 300ms;
+            --md-transition-easing-standard: cubic-bezier(0.4, 0.0, 0.2, 1);
+            --md-transition-easing-decelerate: cubic-bezier(0.0, 0.0, 0.2, 1);
+            --md-transition-easing-accelerate: cubic-bezier(0.4, 0.0, 1, 1);
+        }
+
+        @keyframes md-fadein {
+            from { opacity: 0; transform: translateY(16px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        body {
+            font-family: var(--md-font-family);
+            line-height: 1.6;
+            margin: 0;
+            padding: 20px;
+            background-color: var(--md-surface-100);
+            color: var(--md-surface-900);
+            min-height: 100vh;
+        }
+        
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            background: var(--md-surface-50);
+            border-radius: var(--md-border-radius-extra-large);
+            box-shadow: var(--md-shadow-3);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, var(--md-primary-600), var(--md-primary-700));
+            color: var(--md-surface-50);
+            padding: 40px 32px;
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .logo {
+            width: 64px;
+            height: 64px;
+            border-radius: var(--md-border-radius-large);
+            box-shadow: var(--md-shadow-3);
+            background: var(--md-surface-50);
+            padding: 8px;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 2.5rem;
+            font-weight: var(--md-font-weight-light);
+            letter-spacing: -0.5px;
+        }
+        
+        .header p {
+            margin: 12px 0 0 0;
+            opacity: 0.9;
+            font-size: 1.1rem;
+            font-weight: var(--md-font-weight-regular);
+        }
+
+        
+        .loading {
+            text-align: center;
+            padding: 48px 32px;
+            font-size: 18px;
+            color: var(--md-surface-600);
+            font-weight: var(--md-font-weight-regular);
+        }
+        
+        .error {
+            background-color: var(--md-error-50);
+            color: var(--md-error-700);
+            padding: 16px 24px;
+            margin: 24px;
+            border-radius: var(--md-border-radius-medium);
+            border: 1px solid var(--md-error-200);
+            font-weight: var(--md-font-weight-regular);
+        }
+        
+        .release {
+            border-bottom: 1px solid var(--md-surface-200);
+            padding: 32px;
+            transition: background-color var(--md-transition-duration-medium) var(--md-transition-easing-standard);
+        }
+        
+        .release:last-child {
+            border-bottom: none;
+        }
+        
+        .release:hover {
+            background-color: var(--md-surface-100);
+        }
+        
+        .release-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            gap: 16px;
+        }
+        
+        .release-title {
+            flex: 1;
+            min-width: 0;
+        }
+        
+        .release-title h2 {
+            margin: 0;
+            color: var(--md-primary-600);
+            font-size: 1.75rem;
+            font-weight: var(--md-font-weight-medium);
+            letter-spacing: -0.25px;
+        }
+        
+        .release-title h2 a {
+            color: inherit;
+            text-decoration: none;
+            transition: color var(--md-transition-duration-short) var(--md-transition-easing-standard);
+        }
+        
+        .release-title h2 a:hover {
+            color: var(--md-primary-700);
+            text-decoration: none;
+        }
+        
+        .release-meta {
+            display: flex;
+            gap: 16px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        
+        .release-tag {
+            background-color: var(--md-success-500);
+            color: var(--md-surface-50);
+            padding: 6px 12px;
+            border-radius: var(--md-border-radius-large);
+            font-size: 12px;
+            font-weight: var(--md-font-weight-medium);
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+        }
+        
+        .release-date {
+            color: var(--md-surface-600);
+            font-size: 14px;
+            font-weight: var(--md-font-weight-regular);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        
+        .release-author {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: var(--md-surface-600);
+            font-size: 14px;
+            font-weight: var(--md-font-weight-regular);
+        }
+        
+        .release-author img {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            border: 2px solid var(--md-surface-200);
+        }
+        
+        .release-body {
+            background-color: var(--md-surface-100);
+            padding: 20px 24px;
+            border-radius: var(--md-border-radius-medium);
+            border-left: 4px solid var(--md-primary-500);
+            margin-top: 20px;
+            font-size: 15px;
+            line-height: 1.6;
+        }
+        
+        .release-body h1,
+        .release-body h2,
+        .release-body h3 {
+            margin-top: 0;
+            margin-bottom: 12px;
+            color: var(--md-surface-800);
+            font-weight: var(--md-font-weight-medium);
+        }
+
+        .release-body h1 { font-size: 1.5rem; }
+        .release-body h2 { font-size: 1.25rem; }
+        .release-body h3 { font-size: 1.1rem; }
+        
+        .release-body ul {
+            margin: 12px 0;
+            padding-left: 24px;
+        }
+        
+        .release-body li {
+            margin: 8px 0;
+            color: var(--md-surface-700);
+        }
+
+        .release-body strong {
+            color: var(--md-surface-800);
+            font-weight: var(--md-font-weight-medium);
+        }
+
+        .release-body a {
+            color: var(--md-primary-600);
+            text-decoration: none;
+            border-bottom: 1px solid transparent;
+            transition: border-color var(--md-transition-duration-short) var(--md-transition-easing-standard);
+        }
+
+        .release-body a:hover {
+            border-bottom-color: var(--md-primary-600);
+        }
+
+        .release-body code {
+            background-color: var(--md-surface-200);
+            color: var(--md-surface-800);
+            padding: 2px 6px;
+            border-radius: var(--md-border-radius-small);
+            font-size: 0.9em;
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+        }
+
+        .release-body pre {
+            background-color: var(--md-surface-200);
+            padding: 16px;
+            border-radius: var(--md-border-radius-medium);
+            overflow-x: auto;
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            font-size: 0.9em;
+        }
+        
+        .prerelease {
+            border-left-color: var(--md-warning-500);
+        }
+        
+        .prerelease .release-tag {
+            background-color: var(--md-warning-500);
+            color: var(--md-surface-900);
+        }
+
+        .prerelease .release-body {
+            border-left-color: var(--md-warning-500);
+        }
+        
+        .draft {
+            opacity: 0.7;
+            border-left-color: var(--md-surface-400);
+        }
+        
+        .draft .release-tag {
+            background-color: var(--md-surface-400);
+            color: var(--md-surface-50);
+        }
+
+        .draft .release-body {
+            border-left-color: var(--md-surface-400);
+        }
+        
+        .stats {
+            padding: 24px 32px;
+            background-color: var(--md-surface-100);
+            border-top: 1px solid var(--md-surface-200);
+            text-align: center;
+            color: var(--md-surface-600);
+            font-size: 14px;
+            font-weight: var(--md-font-weight-regular);
+        }
+        
+        @media (max-width: 768px) {
+            body {
+                padding: 12px;
+            }
+            
+            .header {
+                padding: 32px 24px;
+            }
+            
+            .header h1 {
+                font-size: 2rem;
+            }
+            
+            .controls {
+                padding: 20px 24px;
+            }
+            
+            .release {
+                padding: 24px 20px;
+            }
+            
+            .release-header {
+                flex-direction: column;
+                gap: 12px;
+                align-items: flex-start;
+            }
+            
+            .release-meta {
+                justify-content: flex-start;
+                gap: 12px;
+            }
+
+            .release-title h2 {
+                font-size: 1.5rem;
+            }
+
+            .stats {
+                padding: 20px 24px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            body {
+                padding: 8px;
+            }
+
+            .header {
+                padding: 24px 16px;
+            }
+
+            .header h1 {
+                font-size: 1.75rem;
+            }
+
+            .controls {
+                padding: 16px;
+            }
+
+            .release {
+                padding: 20px 16px;
+            }
+
+            .release-body {
+                padding: 16px 20px;
+            }
+
+            .stats {
+                padding: 16px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <img src="https://cvws.icloud-content.com/B/AWaKIFL3l3JldPM9Leo-T2ggHDca/$%7Bf%7D?o=AtN0gCF-gEHkrMf6ht05NYIBAqA5U0dTd7ymd_6krN_gY72w-75OI5kEdgqb6qH-Zg&v=1&x=3&a=CAogJ6ZyhLdV0e_BqdpmL4zjCI-Z5ZbT8WneZEK2DOrf3tMSexCA16ekizMYgLSDposzIgEAUgQgHDcaajDSrn1v1ArfE9c6Vv-cw-uqsbDLc0OypKc9YYAgGvU7PBk8IGI1mBpagLMYnYIYtB1yMMsCYXVU4Q7P5cvBukIqzXh4lKMU1p7MuH6giqM4vBKnXhAsmtnqAgmn9KTU33HAlQ&e=1755379194&fl=&r=80dcae1a-8253-41ac-a003-67989a2d33aa-1&k=_&ckc=com.apple.shortcuts&ckz=_defaultZone&p=33&s=rz7YAc6CEGmWkQSSHYm_ch1qY5M" alt="ImmTranslator Logo" class="logo">
+            <div>
+                <h1>Changelog</h1>
+                <p>Version history and updates</p>
+            </div>
+        </div>
+        
+
+        
+        <div id="content">
+            <div class="loading">
+                📡 Loading releases...
+            </div>
+        </div>
+        
+        <div class="stats" id="stats" style="display: none;"></div>
+    </div>
+
+    <script>
+        const API_URL = 'https://api.github.com/repos/fizzi01/ImmTranslator/releases';
+        let allReleases = [];
+        
+        // Load releases on page startup
+        document.addEventListener('DOMContentLoaded', function() {
+            loadReleases();
+        });
+        
+        async function loadReleases() {
+            const contentDiv = document.getElementById('content');
+            const statsDiv = document.getElementById('stats');
+            
+            try {
+                contentDiv.innerHTML = '<div class="loading">📡 Loading releases...</div>';
+                statsDiv.style.display = 'none';
+                
+                const response = await fetch(API_URL, {
+                    headers: {
+                        'Accept': 'application/vnd.github+json',
+                        'X-GitHub-Api-Version': '2022-11-28'
+                    }
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`Errore HTTP: ${response.status}`);
+                }
+                
+                allReleases = await response.json();
+                displayReleases(allReleases);
+                
+            } catch (error) {
+                console.error('Error loading releases:', error);
+                contentDiv.innerHTML = `
+                    <div class="error">
+                        ❌ <strong>Error loading releases:</strong><br>
+                        ${error.message}<br>
+                        <small>Please check your internet connection and try again.</small>
+                    </div>
+                `;
+            }
+        }
+        
+        function displayReleases(releases) {
+            const contentDiv = document.getElementById('content');
+            const statsDiv = document.getElementById('stats');
+            
+            if (releases.length === 0) {
+                contentDiv.innerHTML = `
+                    <div class="error">
+                        🔍 <strong>No releases found</strong><br>
+                        The repository has no published releases.
+                    </div>
+                `;
+                return;
+            }
+            
+            // Generate HTML for releases
+            let html = '';
+            releases.forEach(release => {
+                const releaseDate = new Date(release.published_at || release.created_at);
+                const formattedDate = releaseDate.toLocaleDateString('en-US', {
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                });
+                
+                const releaseClass = release.prerelease ? 'prerelease' : (release.draft ? 'draft' : '');
+                const tagText = release.prerelease ? 'Pre-release' : (release.draft ? 'Draft' : 'Release');
+                
+                html += `
+                    <div class="release ${releaseClass}">
+                        <div class="release-header">
+                            <div class="release-title">
+                                <h2><a href="${release.html_url}" target="_blank" rel="noopener">${release.name || release.tag_name}</a></h2>
+                            </div>
+                            <div class="release-meta">
+                                <span class="release-tag">${tagText} ${release.tag_name}</span>
+                <span class="release-date">📅 ${formattedDate}</span>
+                                <div class="release-author">
+                                    <img src="${release.author.avatar_url}" alt="${release.author.login}">
+                                    <span>${release.author.login}</span>
+                                </div>
+                            </div>
+                        </div>
+                        ${release.body ? `<div class="release-body">${parseMarkdown(release.body)}</div>` : ''}
+                    </div>
+                `;
+            });
+            
+            contentDiv.innerHTML = html;
+            
+            // Show statistics
+            const totalReleases = releases.length;
+            const prereleases = releases.filter(r => r.prerelease).length;
+            const drafts = releases.filter(r => r.draft).length;
+            
+            let statsText = `📊 ${totalReleases} total releases`;
+            if (prereleases > 0) {
+                statsText += ` • ${prereleases} pre-releases`;
+            }
+            if (drafts > 0) {
+                statsText += ` • ${drafts} drafts`;
+            }
+            
+            statsDiv.innerHTML = statsText;
+            statsDiv.style.display = 'block';
+        }
+        
+        
+        // Simple markdown parser with URL improvement
+        function parseMarkdown(text) {
+            return text
+                // Headers
+                .replace(/^### (.*$)/gm, '<h3>$1</h3>')
+                .replace(/^## (.*$)/gm, '<h2>$1</h2>')
+                .replace(/^# (.*$)/gm, '<h1>$1</h1>')
+                // Bold
+                .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                // Italic
+                .replace(/\*(.*?)\*/g, '<em>$1</em>')
+                // Links (Markdown format)
+                .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>')
+                // Auto-link URLs (HTTP/HTTPS)
+                .replace(/(https?:\/\/[^\s<>"']+)/g, '<a href="$1" target="_blank" rel="noopener">$1</a>')
+                // Code blocks
+                .replace(/```[\s\S]*?```/g, '<pre><code>$&</code></pre>')
+                // Inline code
+                .replace(/`([^`]+)`/g, '<code>$1</code>')
+                // Line breaks
+                .replace(/\r?\n/g, '<br>')
+                // Lists (simplified)
+                .replace(/^- (.*)$/gm, '<li>$1</li>')
+                .replace(/(<li>.*<\/li>)/s, '<ul>$1</ul>');
+        }
+    </script>
+</body>
+</html>
