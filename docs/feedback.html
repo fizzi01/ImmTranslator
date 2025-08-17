@@ -1,0 +1,1025 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Immersive Translator - Feedback</title>
+    <script src="https://cdn.jsdelivr.net/gh/fizzi01/ImmTranslator@0.3/dist/main.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/gh/fizzi01/ImmTranslator@0.3/dist/translationWorker.min.js"></script>
+    <style>
+        /* Import Material Design variables from main.css */
+        :root {
+            /* Primary Colors - Based on #76C8DB */
+            --md-primary-50: #e8f6f9;
+            --md-primary-100: #c6e9f0;
+            --md-primary-200: #9fdae6;
+            --md-primary-300: #76c8db;
+            --md-primary-400: #58bbd4;
+            --md-primary-500: #3aaecd;
+            --md-primary-600: #349bc3;
+            --md-primary-700: #2d85b5;
+            --md-primary-800: #2770a7;
+            --md-primary-900: #1c4e8f;
+
+            /* Secondary Colors - Complementary warm coral */
+            --md-secondary-50: #fdf2f0;
+            --md-secondary-100: #faddd7;
+            --md-secondary-200: #f7c5bb;
+            --md-secondary-300: #f3ac9f;
+            --md-secondary-400: #f0988a;
+            --md-secondary-500: #ed8575;
+            --md-secondary-600: #eb7d6d;
+            --md-secondary-700: #e87262;
+            --md-secondary-800: #e56858;
+            --md-secondary-900: #e05645;
+
+            /* Surface Colors - Cool grays with teal undertones */
+            --md-surface-50: #f8fafb;
+            --md-surface-100: #f1f5f7;
+            --md-surface-200: #e8eff2;
+            --md-surface-300: #d8e3e8;
+            --md-surface-400: #b8c9d1;
+            --md-surface-500: #94a8b3;
+            --md-surface-600: #718590;
+            --md-surface-700: #5a6b75;
+            --md-surface-800: #42505a;
+            --md-surface-900: #2a3439;
+
+            /* Success, Warning, Error Colors */
+            --md-success-50: #f0faf4;
+            --md-success-100: #dcf4e6;
+            --md-success-500: #22c55e;
+            --md-success-700: #15803d;
+
+            --md-warning-50: #fffbeb;
+            --md-warning-100: #fef3c7;
+            --md-warning-500: #f59e0b;
+            --md-warning-700: #d97706;
+
+            --md-error-50: #fef2f2;
+            --md-error-100: #fee2e2;
+            --md-error-500: #ef4444;
+            --md-error-700: #dc2626;
+
+            /* Shadows */
+            --md-shadow-1: 0px 2px 1px -1px rgba(0,0,0,0.2), 0px 1px 1px 0px rgba(0,0,0,0.14), 0px 1px 3px 0px rgba(0,0,0,0.12);
+            --md-shadow-2: 0px 3px 1px -2px rgba(0,0,0,0.2), 0px 2px 2px 0px rgba(0,0,0,0.14), 0px 1px 5px 0px rgba(0,0,0,0.12);
+            --md-shadow-3: 0px 3px 3px -2px rgba(0,0,0,0.2), 0px 3px 4px 0px rgba(0,0,0,0.14), 0px 1px 8px 0px rgba(0,0,0,0.12);
+            --md-shadow-4: 0px 2px 4px -1px rgba(0,0,0,0.2), 0px 4px 5px 0px rgba(0,0,0,0.14), 0px 1px 10px 0px rgba(0,0,0,0.12);
+            --md-shadow-6: 0px 3px 5px -1px rgba(0,0,0,0.2), 0px 6px 10px 0px rgba(0,0,0,0.14), 0px 1px 18px 0px rgba(0,0,0,0.12);
+            --md-shadow-8: 0px 5px 5px -3px rgba(0,0,0,0.2), 0px 8px 10px 1px rgba(0,0,0,0.14), 0px 3px 14px 2px rgba(0,0,0,0.12);
+
+            /* Typography */
+            --md-font-family: 'Roboto', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            --md-font-weight-light: 300;
+            --md-font-weight-regular: 400;
+            --md-font-weight-medium: 500;
+            --md-font-weight-bold: 700;
+
+            /* Border Radius */
+            --md-border-radius-small: 4px;
+            --md-border-radius-medium: 8px;
+            --md-border-radius-large: 12px;
+            --md-border-radius-extra-large: 16px;
+
+            /* Transitions */
+            --md-transition-duration-short: 150ms;
+            --md-transition-duration-medium: 250ms;
+            --md-transition-duration-long: 300ms;
+            --md-transition-easing-standard: cubic-bezier(0.4, 0.0, 0.2, 1);
+            --md-transition-easing-decelerate: cubic-bezier(0.0, 0.0, 0.2, 1);
+            --md-transition-easing-accelerate: cubic-bezier(0.4, 0.0, 1, 1);
+        }
+
+        @keyframes md-fadein {
+            from { opacity: 0; transform: translateY(16px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+
+        body {
+            font-family: var(--md-font-family);
+            line-height: 1.6;
+            margin: 0;
+            padding: 20px;
+            background-color: var(--md-surface-100);
+            color: var(--md-surface-900);
+            min-height: 100vh;
+        }
+        
+        .container {
+            max-width: 500px;
+            margin: 0 auto;
+            background: var(--md-surface-50);
+            border-radius: var(--md-border-radius-large);
+            box-shadow: var(--md-shadow-2);
+            overflow: hidden;
+        }
+
+        .form-container {
+            padding: 24px;
+            animation: md-fadein 0.6s ease-out;
+        }
+
+        .form-title {
+            text-align: center;
+            margin-bottom: 20px;
+            color: var(--md-primary-700);
+            font-size: 1.5rem;
+            font-weight: var(--md-font-weight-medium);
+        }
+
+        .feedback-form {
+            max-width: 100%;
+        }
+
+        .form-section {
+            margin-bottom: 20px;
+        }
+
+        .form-section:last-child {
+            margin-bottom: 0;
+        }
+
+        .form-label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: var(--md-font-weight-medium);
+            color: var(--md-surface-800);
+            font-size: 14px;
+        }
+
+        .form-description {
+            display: block;
+            margin-bottom: 12px;
+            font-size: 12px;
+            color: var(--md-surface-600);
+            line-height: 1.4;
+        }
+
+        /* Star Rating */
+        .star-rating {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 8px;
+            justify-content: center;
+            padding: 8px 0;
+        }
+
+        .star-container {
+            position: relative;
+            display: inline-block;
+        }
+
+        .star {
+            font-size: 28px;
+            color: var(--md-surface-400);
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+            user-select: none;
+            position: relative;
+            display: inline-block;
+            filter: drop-shadow(0 1px 2px rgba(0,0,0,0.2));
+            opacity: 0.6;
+            will-change: transform, color, opacity, filter;
+        }
+
+        .star:hover,
+        .star.hovered {
+            opacity: 1;
+            transform: scale(1.15) rotate(-3deg);
+            filter: drop-shadow(0 3px 6px rgba(0,0,0,0.3));
+        }
+
+        /* Different colors based on rating - with smoother transitions */
+        .star.rating-1 {
+            transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+        }
+        
+        .star.rating-1.hovered,
+        .star.rating-1.selected {
+            color: #dc2626 !important;
+            filter: drop-shadow(0 3px 6px rgba(220, 38, 38, 0.4)) !important;
+        }
+
+        .star.rating-2 {
+            transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+        }
+        
+        .star.rating-2.hovered,
+        .star.rating-2.selected {
+            color: #ea580c !important;
+            filter: drop-shadow(0 3px 6px rgba(234, 88, 12, 0.4)) !important;
+        }
+
+        .star.rating-3 {
+            transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+        }
+        
+        .star.rating-3.hovered,
+        .star.rating-3.selected {
+            color: #d97706 !important;
+            filter: drop-shadow(0 3px 6px rgba(217, 119, 6, 0.4)) !important;
+        }
+
+        .star.rating-4 {
+            transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+        }
+        
+        .star.rating-4.hovered,
+        .star.rating-4.selected {
+            color: #ca8a04 !important;
+            filter: drop-shadow(0 3px 6px rgba(202, 138, 4, 0.4)) !important;
+        }
+
+        .star.rating-5 {
+            transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+        }
+        
+        .star.rating-5.hovered,
+        .star.rating-5.selected {
+            color: #16a34a !important;
+            filter: drop-shadow(0 3px 6px rgba(22, 163, 74, 0.4)) !important;
+        }
+
+        .star.selected {
+            opacity: 1;
+            transform: scale(1.1);
+        }
+
+        .star.selected::after {
+            content: '✨';
+            position: absolute;
+            top: -10px;
+            right: -10px;
+            font-size: 12px;
+            opacity: 0;
+            animation: sparkle 0.8s ease-out;
+            pointer-events: none;
+        }
+
+        @keyframes starPulse {
+            0% { 
+                transform: scale(1.1);
+            }
+            50% { 
+                transform: scale(1.3) rotate(5deg);
+                opacity: 1;
+            }
+            100% { 
+                transform: scale(1.1);
+                opacity: 1;
+            }
+        }
+
+        @keyframes sparkle {
+            0% {
+                opacity: 0;
+                transform: translateY(0) scale(0.5);
+            }
+            50% {
+                opacity: 1;
+                transform: translateY(-8px) scale(1);
+            }
+            100% {
+                opacity: 0;
+                transform: translateY(-16px) scale(0.5);
+            }
+        }
+
+        @keyframes starAttention {
+            0% { 
+                transform: scale(1);
+                opacity: 0.6;
+            }
+            25% { 
+                transform: scale(1.2);
+                opacity: 1;
+                color: var(--md-warning-500);
+            }
+            50% { 
+                transform: scale(1);
+                opacity: 0.8;
+            }
+            75% { 
+                transform: scale(1.1);
+                opacity: 1;
+                color: var(--md-warning-500);
+            }
+            100% { 
+                transform: scale(1);
+                opacity: 0.6;
+            }
+        }
+
+        .star.attention {
+            animation: starAttention 1.5s ease-in-out infinite;
+            will-change: transform, opacity, color;
+        }
+
+        @keyframes starContainerShake {
+            0%, 100% { transform: translateX(0); }
+            10%, 30%, 50%, 70%, 90% { transform: translateX(-3px); }
+            20%, 40%, 60%, 80% { transform: translateX(3px); }
+        }
+
+        .rating-label {
+            font-size: 13px;
+            color: var(--md-surface-700);
+            margin-top: 8px;
+            min-height: 20px;
+            text-align: center;
+            font-weight: var(--md-font-weight-medium);
+            transition: all 0.3s ease;
+            padding: 4px 12px;
+            border-radius: var(--md-border-radius-large);
+            background: linear-gradient(135deg, var(--md-surface-100), var(--md-surface-200));
+            opacity: 0;
+            transform: translateY(-5px);
+            /* Force reflow on class changes */
+            will-change: opacity, transform, background, color;
+        }
+
+        .rating-label.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .rating-label.excellent {
+            background: linear-gradient(135deg, #dcfce7, #bbf7d0);
+            color: #166534;
+        }
+
+        .rating-label.good {
+            background: linear-gradient(135deg, #fef3c7, #fde68a);
+            color: #92400e;
+        }
+
+        .rating-label.fair {
+            background: linear-gradient(135deg, #fef2f2, #fecaca);
+            color: #991b1b;
+        }
+
+        /* Form Inputs */
+        .form-input {
+            width: 100%;
+            padding: 12px 16px;
+            border: 2px solid var(--md-surface-200);
+            border-radius: var(--md-border-radius-medium);
+            font-family: var(--md-font-family);
+            font-size: 14px;
+            color: var(--md-surface-900);
+            background-color: var(--md-surface-50);
+            transition: all var(--md-transition-duration-medium) var(--md-transition-easing-standard);
+            box-sizing: border-box;
+        }
+
+        .form-input:focus {
+            outline: none;
+            border-color: var(--md-primary-500);
+            box-shadow: 0 0 0 2px rgba(52, 155, 195, 0.1);
+        }
+
+        .form-input::placeholder {
+            color: var(--md-surface-500);
+        }
+
+        .form-textarea {
+            min-height: 80px;
+            resize: vertical;
+            font-family: var(--md-font-family);
+        }
+
+        /* Submit Button */
+        .submit-button {
+            background: linear-gradient(135deg, var(--md-primary-500), var(--md-primary-600));
+            color: var(--md-surface-50);
+            border: none;
+            padding: 12px 24px;
+            font-size: 14px;
+            font-weight: var(--md-font-weight-medium);
+            border-radius: var(--md-border-radius-medium);
+            cursor: pointer;
+            transition: all var(--md-transition-duration-medium) var(--md-transition-easing-standard);
+            box-shadow: var(--md-shadow-2);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            justify-content: center;
+            min-height: 40px;
+            width: 100%;
+        }
+
+        .submit-button:hover:not(:disabled) {
+            background: linear-gradient(135deg, var(--md-primary-600), var(--md-primary-700));
+            box-shadow: var(--md-shadow-4);
+            transform: translateY(-2px);
+        }
+
+        .submit-button:active:not(:disabled) {
+            transform: translateY(0);
+            box-shadow: var(--md-shadow-2);
+        }
+
+        .submit-button:disabled {
+            background: var(--md-surface-400);
+            cursor: not-allowed;
+            box-shadow: none;
+            transform: none;
+        }
+
+        .submit-button.loading {
+            background: var(--md-surface-400);
+            cursor: not-allowed;
+        }
+
+        .loading-spinner {
+            width: 16px;
+            height: 16px;
+            border: 2px solid transparent;
+            border-top: 2px solid var(--md-surface-50);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        /* Success/Error Messages */
+        .message {
+            padding: 12px 16px;
+            border-radius: var(--md-border-radius-medium);
+            font-weight: var(--md-font-weight-medium);
+            margin-top: 16px;
+            display: none;
+            font-size: 13px;
+        }
+
+        .message.success {
+            background-color: var(--md-success-50);
+            color: var(--md-success-700);
+            border: 1px solid var(--md-success-100);
+        }
+
+        .message.error {
+            background-color: var(--md-error-50);
+            color: var(--md-error-700);
+            border: 1px solid var(--md-error-100);
+        }
+
+        .message.warning {
+            background-color: var(--md-warning-50);
+            color: var(--md-warning-700);
+            border: 1px solid var(--md-warning-100);
+        }
+
+        .message.show {
+            display: block;
+            animation: md-fadein 0.4s ease-out;
+        }
+
+        /* Character Counter */
+        .character-counter {
+            text-align: right;
+            font-size: 11px;
+            color: var(--md-surface-500);
+            margin-top: 4px;
+        }
+
+        .character-counter.warning {
+            color: var(--md-warning-600);
+        }
+
+        .character-counter.error {
+            color: var(--md-error-600);
+        }
+
+        /* Form Validation */
+        .form-input.error {
+            border-color: var(--md-error-500);
+            box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1);
+        }
+
+        .form-error {
+            color: var(--md-error-600);
+            font-size: 12px;
+            margin-top: 4px;
+            display: none;
+        }
+
+        .form-error.show {
+            display: block;
+        }
+
+        /* Responsive Design */
+        @media (max-width: 768px) {
+            body {
+                padding: 8px;
+            }
+            
+            .form-container {
+                padding: 20px 16px;
+            }
+            
+            .star {
+                font-size: 26px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            body {
+                padding: 4px;
+            }
+
+            .form-container {
+                padding: 16px 12px;
+            }
+
+            .form-input {
+                padding: 10px 12px;
+                font-size: 16px; /* Prevents zoom on iOS */
+            }
+
+            .star {
+                font-size: 24px;
+            }
+
+            .star-rating {
+                gap: 6px;
+            }
+
+            .submit-button {
+                padding: 12px 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="form-container">
+            <h2 class="form-title">💬 Quick Feedback</h2>
+            
+            <form class="feedback-form" id="feedbackForm" method="POST">
+                <!-- Web3Forms Access Key (hidden) -->
+                <input type="hidden" name="access_key" value="3596b8fd-98d9-4853-b402-09ab9397988d">
+                
+                <!-- Subject (hidden) -->
+                <input type="hidden" name="subject" value="" id="hiddenSubject">
+                
+                <!-- Rating details (hidden) -->
+                <input type="hidden" name="rating_stars" value="" id="hiddenRatingStars">
+                <input type="hidden" name="rating_description" value="" id="hiddenRatingDescription">
+                
+                <!-- Bot check (hidden) -->
+                <input type="checkbox" name="botcheck" class="hidden" style="display: none;">
+                
+                <!-- Rating Section -->
+                <div class="form-section">
+                    <label class="form-label">Rate your experience ⭐</label>
+                    <div class="star-rating" id="starRating">
+                        <div class="star-container">
+                            <span class="star" data-rating="1">⭐</span>
+                        </div>
+                        <div class="star-container">
+                            <span class="star" data-rating="2">⭐</span>
+                        </div>
+                        <div class="star-container">
+                            <span class="star" data-rating="3">⭐</span>
+                        </div>
+                        <div class="star-container">
+                            <span class="star" data-rating="4">⭐</span>
+                        </div>
+                        <div class="star-container">
+                            <span class="star" data-rating="5">⭐</span>
+                        </div>
+                    </div>
+                    <div class="rating-label" id="ratingLabel"></div>
+                    <input type="hidden" id="rating" name="rating" value="0">
+                </div>
+
+                <!-- Nickname Section -->
+                <div class="form-section">
+                    <label class="form-label" for="nickname">Nickname (optional)</label>
+                    <input 
+                        type="text" 
+                        id="nickname" 
+                        name="name" 
+                        class="form-input" 
+                        placeholder="Your nickname..."
+                        maxlength="50"
+                    >
+                    <div class="character-counter" id="nicknameCounter">0/50</div>
+                </div>
+
+                <!-- Feedback Section -->
+                <div class="form-section">
+                    <label class="form-label" for="feedback">Comments (optional)</label>
+                    <textarea 
+                        id="feedback" 
+                        name="message" 
+                        class="form-input form-textarea" 
+                        placeholder="Share your thoughts or suggestions..."
+                        maxlength="500"
+                    ></textarea>
+                    <div class="character-counter" id="feedbackCounter">0/500</div>
+                </div>
+
+                <!-- Technical info (hidden) -->
+                <input type="hidden" name="timestamp" value="" id="hiddenTimestamp">
+                <input type="hidden" name="user_agent" value="" id="hiddenUserAgent">
+                <input type="hidden" name="page_url" value="" id="hiddenPageUrl">
+
+                <!-- Submit Button -->
+                <div class="form-section">
+                    <button type="submit" class="submit-button" id="submitBtn">
+                        <span id="submitText">Send Feedback</span>
+                        <div class="loading-spinner" id="loadingSpinner" style="display: none;"></div>
+                    </button>
+                </div>
+
+                <!-- Messages -->
+                <div class="message success" id="successMessage">
+                    ✅ Thank you! Your feedback has been sent.
+                </div>
+                <div class="message error" id="errorMessage">
+                    ❌ Error sending feedback. Please try again.
+                </div>
+                <div class="message warning" id="warningMessage">
+                    ⚠️ Please select a rating before submitting your feedback.
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        // Rating System
+        const stars = document.querySelectorAll('.star');
+        const ratingLabel = document.getElementById('ratingLabel');
+        const ratingInput = document.getElementById('rating');
+        
+        const ratingLabels = {
+            0: { text: '', class: '' },
+            1: { text: '😞 Poor - We can do better!', class: 'fair' },
+            2: { text: '😐 Fair - Room for improvement', class: 'fair' },
+            3: { text: '🙂 Good - On the right track!', class: 'good' },
+            4: { text: '😊 Very Good - Almost perfect!', class: 'good' },
+            5: { text: '🤩 Excellent - You made our day!', class: 'excellent' }
+        };
+
+        let currentRating = 0;
+
+        let isHovering = false;
+        let hoverRating = 0;
+
+        stars.forEach((star, index) => {
+            star.addEventListener('mouseenter', () => {
+                isHovering = true;
+                hoverRating = index + 1;
+                highlightStars(hoverRating);
+                showRatingLabel(hoverRating);
+            });
+
+            star.addEventListener('mouseleave', () => {
+                // Only reset if we're actually leaving the star rating area
+                // This will be handled by the container mouseleave
+            });
+
+            star.addEventListener('click', () => {
+                const newRating = index + 1;
+                currentRating = newRating;
+                ratingInput.value = currentRating;
+                isHovering = false;
+                
+                // Immediately update both stars and label
+                highlightStars(currentRating);
+                showRatingLabel(currentRating);
+                
+                // Add haptic feedback (if supported)
+                if (navigator.vibrate) {
+                    navigator.vibrate(50);
+                }
+                
+                // Add click sound effect (optional - you can remove this if not needed)
+                playClickSound();
+            });
+        });
+
+        // Add container level mouse events for better control
+        const starRating = document.getElementById('starRating');
+        starRating.addEventListener('mouseleave', () => {
+            isHovering = false;
+            // Add a small delay to prevent flickering
+            setTimeout(() => {
+                if (!isHovering) {
+                    highlightStars(currentRating);
+                    showRatingLabel(currentRating);
+                }
+            }, 50);
+        });
+
+        // Optional click sound function (silent fallback)
+        function playClickSound() {
+            try {
+                // Create a simple click sound using Web Audio API
+                const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                const oscillator = audioContext.createOscillator();
+                const gainNode = audioContext.createGain();
+                
+                oscillator.connect(gainNode);
+                gainNode.connect(audioContext.destination);
+                
+                oscillator.frequency.setValueAtTime(800, audioContext.currentTime);
+                oscillator.frequency.setValueAtTime(400, audioContext.currentTime + 0.1);
+                
+                gainNode.gain.setValueAtTime(0.1, audioContext.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.1);
+                
+                oscillator.start(audioContext.currentTime);
+                oscillator.stop(audioContext.currentTime + 0.1);
+            } catch (e) {
+                // Silent fallback if audio is not supported
+            }
+        }
+
+        function highlightStars(count) {
+            // Use requestAnimationFrame to ensure smooth transitions
+            requestAnimationFrame(() => {
+                stars.forEach((star, index) => {
+                    // Remove all classes first to prevent conflicts
+                    star.classList.remove('selected', 'hovered', 'rating-1', 'rating-2', 'rating-3', 'rating-4', 'rating-5');
+                    
+                    if (index < count && count > 0) {
+                        // Add rating class based on the count (overall rating)
+                        star.classList.add(`rating-${count}`);
+                        
+                        // All stars up to the count should be highlighted
+                        if (index < currentRating) {
+                            star.classList.add('selected');
+                        } else {
+                            star.classList.add('hovered');
+                        }
+                    }
+                    // If count is 0 or star is not highlighted, it will return to default gray state
+                });
+            });
+        }
+
+        function showRatingLabel(rating) {
+            const labelData = ratingLabels[rating];
+            
+            // Force remove all previous classes to prevent sticking
+            ratingLabel.className = 'rating-label';
+            
+            if (labelData && labelData.text) {
+                // Use setTimeout to ensure DOM update before adding new classes
+                setTimeout(() => {
+                    ratingLabel.textContent = labelData.text;
+                    ratingLabel.className = `rating-label show ${labelData.class}`;
+                }, 10);
+            } else {
+                ratingLabel.textContent = '';
+                ratingLabel.className = 'rating-label';
+            }
+        }
+
+        // Character Counters
+        function setupCharacterCounter(inputId, counterId, maxLength) {
+            const input = document.getElementById(inputId);
+            const counter = document.getElementById(counterId);
+
+            input.addEventListener('input', () => {
+                const length = input.value.length;
+                counter.textContent = `${length}/${maxLength}`;
+                
+                counter.classList.remove('warning', 'error');
+                if (length > maxLength * 0.9) {
+                    counter.classList.add('warning');
+                }
+                if (length >= maxLength) {
+                    counter.classList.add('error');
+                }
+            });
+        }
+
+        setupCharacterCounter('nickname', 'nicknameCounter', 50);
+        setupCharacterCounter('feedback', 'feedbackCounter', 500);
+
+        // Form Submission
+        const form = document.getElementById('feedbackForm');
+        const submitBtn = document.getElementById('submitBtn');
+        const submitText = document.getElementById('submitText');
+        const loadingSpinner = document.getElementById('loadingSpinner');
+        const successMessage = document.getElementById('successMessage');
+        const errorMessage = document.getElementById('errorMessage');
+        const warningMessage = document.getElementById('warningMessage');
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            // Hide previous messages
+            hideAllMessages();
+
+            // Validate rating
+            if (currentRating === 0) {
+                showWarningMessage();
+                return;
+            }
+
+            // Populate hidden fields with data (Web3Forms will format these automatically)
+            const hiddenSubject = document.getElementById('hiddenSubject');
+            const hiddenRatingStars = document.getElementById('hiddenRatingStars');
+            const hiddenRatingDescription = document.getElementById('hiddenRatingDescription');
+            const hiddenTimestamp = document.getElementById('hiddenTimestamp');
+            const hiddenUserAgent = document.getElementById('hiddenUserAgent');
+            const hiddenPageUrl = document.getElementById('hiddenPageUrl');
+            
+            hiddenSubject.value = `Immersive Translator Feedback - ${currentRating}/5 Stars`;
+            hiddenRatingStars.value = `${currentRating}/5`;
+            hiddenRatingDescription.value = ratingLabels[currentRating].text;
+            hiddenTimestamp.value = new Date().toLocaleString();
+            hiddenUserAgent.value = navigator.userAgent;
+            hiddenPageUrl.value = window.location.href;
+
+            // Show loading state
+            setLoadingState(true);
+
+            try {
+                await sendFeedback();
+                showSuccessMessage();
+                resetForm();
+            } catch (error) {
+                console.error('Error sending feedback:', error);
+                showErrorMessage();
+            } finally {
+                setLoadingState(false);
+            }
+        });
+
+        function setLoadingState(loading) {
+            submitBtn.classList.toggle('loading', loading);
+            submitBtn.disabled = loading;
+            submitText.style.display = loading ? 'none' : 'block';
+            loadingSpinner.style.display = loading ? 'block' : 'none';
+        }
+
+        function hideAllMessages() {
+            successMessage.classList.remove('show');
+            errorMessage.classList.remove('show');
+            warningMessage.classList.remove('show');
+        }
+
+        function showSuccessMessage() {
+            hideAllMessages();
+            successMessage.classList.add('show');
+            // Auto-hide after 5 seconds
+            setTimeout(() => {
+                successMessage.classList.remove('show');
+            }, 5000);
+        }
+
+        function showErrorMessage() {
+            hideAllMessages();
+            errorMessage.classList.add('show');
+            // Auto-hide after 5 seconds
+            setTimeout(() => {
+                errorMessage.classList.remove('show');
+            }, 5000);
+        }
+
+        function showWarningMessage() {
+            hideAllMessages();
+            warningMessage.classList.add('show');
+            
+            // Add visual feedback to stars
+            showStarAttention();
+            
+            // Auto-hide after 3 seconds (warnings are less critical)
+            setTimeout(() => {
+                warningMessage.classList.remove('show');
+            }, 3000);
+        }
+
+        function showStarAttention() {
+            // Add attention animation to all stars
+            stars.forEach(star => {
+                star.classList.add('attention');
+            });
+            
+            // Remove attention animation after 4 seconds (1 second longer than warning message)
+            setTimeout(() => {
+                stars.forEach(star => {
+                    star.classList.remove('attention');
+                });
+            }, 4000);
+            
+            // Add a subtle shake effect to the star rating container
+            const starRating = document.getElementById('starRating');
+            starRating.style.animation = 'none';
+            setTimeout(() => {
+                starRating.style.animation = 'starContainerShake 0.5s ease-in-out';
+                setTimeout(() => {
+                    starRating.style.animation = 'none';
+                }, 500);
+            }, 10);
+        }
+
+        // Generic function to show custom messages
+        function showMessage(message, type = 'warning', duration = 3000) {
+            const messageEl = document.getElementById(`${type}Message`);
+            if (messageEl) {
+                hideAllMessages();
+                // Update message text if needed
+                if (messageEl.textContent !== message) {
+                    const icon = type === 'success' ? '✅' : type === 'error' ? '❌' : '⚠️';
+                    messageEl.textContent = `${icon} ${message}`;
+                }
+                messageEl.classList.add('show');
+                setTimeout(() => {
+                    messageEl.classList.remove('show');
+                }, duration);
+            }
+        }
+
+        function resetForm() {
+            form.reset();
+            currentRating = 0;
+            ratingInput.value = 0;
+            
+            // Reset hidden fields
+            document.getElementById('hiddenSubject').value = '';
+            document.getElementById('hiddenRatingStars').value = '';
+            document.getElementById('hiddenRatingDescription').value = '';
+            document.getElementById('hiddenTimestamp').value = '';
+            document.getElementById('hiddenUserAgent').value = '';
+            document.getElementById('hiddenPageUrl').value = '';
+            
+            // Reset stars and label with proper sequencing
+            requestAnimationFrame(() => {
+                highlightStars(0);
+                setTimeout(() => {
+                    showRatingLabel(0);
+                }, 10);
+            });
+            
+            document.getElementById('nicknameCounter').textContent = '0/50';
+            document.getElementById('feedbackCounter').textContent = '0/500';
+        }
+
+        async function sendFeedback() {
+            const formData = new FormData(form);
+            const object = Object.fromEntries(formData);
+            const json = JSON.stringify(object);
+
+            const response = await fetch('https://api.web3forms.com/submit', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                },
+                body: json
+            });
+
+            const result = await response.json();
+            
+            if (response.status !== 200) {
+                throw new Error(result.message || 'Failed to send feedback');
+            }
+            
+            return result;
+        }
+
+        // Initialize form
+        document.addEventListener('DOMContentLoaded', () => {
+            // Focus on first interactive element after page load
+            setTimeout(() => {
+                stars[0].focus();
+            }, 500);
+        });
+
+        // Keyboard navigation for stars
+        stars.forEach((star, index) => {
+            star.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    star.click();
+                } else if (e.key === 'ArrowRight' && index < stars.length - 1) {
+                    e.preventDefault();
+                    stars[index + 1].focus();
+                } else if (e.key === 'ArrowLeft' && index > 0) {
+                    e.preventDefault();
+                    stars[index - 1].focus();
+                }
+            });
+            
+            // Make stars focusable
+            star.setAttribute('tabindex', '0');
+        });
+    </script>
+</body>
+</html>
