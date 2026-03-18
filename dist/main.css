@@ -64,7 +64,7 @@
     --md-shadow-12: 0px 7px 8px -4px rgba(0,0,0,0.2), 0px 12px 17px 2px rgba(0,0,0,0.14), 0px 5px 22px 4px rgba(0,0,0,0.12);
 
     /* Typography */
-    --md-font-family: 'Roboto', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    --md-font-family: "Roboto", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     --md-font-weight-light: 300;
     --md-font-weight-regular: 400;
     --md-font-weight-medium: 500;
@@ -482,7 +482,7 @@
 }
 
 .immTransl-control-btn::before {
-    content: '';
+    content: "";
     position: absolute;
     top: 0;
     left: 0;
@@ -651,7 +651,7 @@
 }
 
 .text-retry-button::before {
-    content: '';
+    content: "";
     position: absolute;
     top: 0;
     left: 0;
@@ -756,7 +756,7 @@
 .ocr-overlay {
     position: absolute !important;
     color: #fff !important;
-    font-family: 'Helvetica Neue', Arial, sans-serif !important;
+    font-family: "Helvetica Neue", Arial, sans-serif !important;
     text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6) !important;
     padding: 4px 8px !important;
     border-radius: 0px !important;
@@ -778,7 +778,7 @@
     height: var(--box-height, auto);
     transition: left 0.05s ease, top 0.05s ease;
     background: linear-gradient(135deg, rgba(44, 62, 80, 0.95), rgba(52, 73, 94, 0.85));
-    box-shadow: 8px 8px 11px rgba(0, 0, 0, 0.1), 0 1px 2px rgba(0, 0, 0, 0.1) !important;
+    /* box-shadow: 8px 8px 11px rgba(0, 0, 0, 0.1), 0 1px 2px rgba(0, 0, 0, 0.1) !important; */
     color: rgb(255, 255, 255);
     font-weight: 400 !important;
     display: flex;
@@ -786,8 +786,8 @@
     align-items: center !important;
     flex-direction: column !important;
     -webkit-overflow-scrolling: touch;
-    backdrop-filter: blur(40px) !important;
-    -webkit-backdrop-filter: blur(40px) !important;
+    /* backdrop-filter: blur(40px) !important;
+    -webkit-backdrop-filter: blur(40px) !important; */
     hyphens: auto !important;
     -webkit-hyphens: auto !important;
     line-height: 1.2em !important;
@@ -797,7 +797,7 @@
     letter-spacing: normal !important;
     border-radius: 8px !important;
     /*font-size: clamp(2px, 1vw, 10px) !important;*/
-    font-family: 'Helvetica Neue', Arial, sans-serif !important;
+    font-family: "Helvetica Neue", Arial, sans-serif !important;
     text-align: left !important;
     padding: 2px 4px !important;
     overflow: auto !important;
@@ -979,7 +979,7 @@
 }
 
 #pdf-toolbar button::before {
-    content: '';
+    content: "";
     position: absolute;
     top: 0;
     left: 0;
@@ -1180,7 +1180,7 @@
 }
 
 #pdfOptionsModal input[type="radio"]:checked::before {
-    content: '';
+    content: "";
     position: absolute;
     top: 50%;
     left: 50%;
@@ -1305,7 +1305,7 @@
 }
 
 #pdfOptionsModal button::before {
-    content: '';
+    content: "";
     position: absolute;
     top: 0;
     left: 0;
