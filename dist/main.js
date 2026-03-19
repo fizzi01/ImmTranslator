@@ -18,7 +18,7 @@
             translationPaused = !1, feedbackCallback("Resumed", !0);
         }
         static cancelTranslation(notificationCallback = () => {}, feedbackCallback = () => {}) {
-            translationCanceled = !0, feedbackCallback("Canceled", !1);
+            translationCanceled = !0, translationActive = !1, feedbackCallback("Canceled", !1);
         }
         static translationStatus(isActive) {
             translationActive = isActive;
@@ -168,19 +168,21 @@
             try {
                 const containers = document.querySelectorAll(".ocr-container");
                 if (0 === containers.length) return;
-                const pdfViewer = document.getElementById("pdf-viewer");
-                let currentZoomFactor = 1;
-                if (pdfViewer && pdfViewer.style.transform) {
-                    const match = pdfViewer.style.transform.match(/scale\(([\d.]+)\)/);
-                    match && match[1] && (currentZoomFactor = parseFloat(match[1]));
-                }
+                const pdfContainer = document.getElementById("pdf-container");
+                const currentZoomWidth = pdfContainer ? pdfContainer.style.width : "100%";
                 let firstCanvas = containers[0].querySelector("canvas[data-ocr-processed='true']");
                 firstCanvas || (firstCanvas = containers[0].querySelector("canvas"));
                 if (!firstCanvas) throw new Error("No pages found");
-                pdfViewer.style.transform = "scale(1)";
+                pdfContainer && (pdfContainer.style.width = firstCanvas.width + "px");
                 const zoomInButton = document.getElementById("zoomIn"), zoomOutButton = document.getElementById("zoomOut");
-                zoomInButton && (zoomInButton.disabled = !0), zoomOutButton && (zoomOutButton.disabled = !0), 
-                await ImmUtils.sleep(500);
+                zoomInButton && (zoomInButton.disabled = !0), zoomOutButton && (zoomOutButton.disabled = !0),
+                await ImmUtils.sleep(300);
+                containers.forEach(c => {
+                    c.querySelectorAll(".ocr-box").forEach(box => {
+                        try { OCRStrategy.adjustFontSize(box); } catch(e) {}
+                    });
+                });
+                await ImmUtils.sleep(100);
                 const pageWidth = firstCanvas.offsetWidth, pageHeight = firstCanvas.offsetHeight, orientation = pageWidth > pageHeight ? "landscape" : "portrait", {jsPDF: jsPDF} = window.jspdf, pdf = new jsPDF({
                     orientation: orientation,
                     unit: "px",
@@ -267,7 +269,14 @@
                     pdf.internal.pageSize.height = iPageHeight, pdf.internal.pageSize.orientation = iOrientation), 
                     pdf.addImage(imgData, "JPEG", 0, 0, iPageWidth, iPageHeight), await new Promise(resolve => setTimeout(resolve, 50));
                 }
-                pdfViewer.style.transform = "scale(" + currentZoomFactor + ")", zoomInButton && (zoomInButton.disabled = !1), 
+                pdfContainer && (pdfContainer.style.width = currentZoomWidth);
+                await ImmUtils.sleep(100);
+                containers.forEach(c => {
+                    c.querySelectorAll(".ocr-box").forEach(box => {
+                        try { OCRStrategy.adjustFontSize(box); } catch(e) {}
+                    });
+                });
+                zoomInButton && (zoomInButton.disabled = !1),
                 zoomOutButton && (zoomOutButton.disabled = !1), logFunction("PDF Ready ✅", "success");
                 const name = fileName || "PDF";
                 pdf.save(`${name}_translated.pdf`);
@@ -283,9 +292,8 @@
             const viewport = page.getViewport({ scale: scale, dontFlip: !1 });
             const pageContainer = document.createElement("div");
             pageContainer.classList.add("ocr-container"), pageContainer.style.position = "relative",
-            pageContainer.style.display = "inline-block",
-            pageContainer.style.width = viewport.width + "px",
-            pageContainer.style.height = viewport.height + "px",
+            pageContainer.style.width = "100%",
+            pageContainer.style.aspectRatio = viewport.width + " / " + viewport.height,
             pageContainer.style.background = "#fafafa",
             pageContainer.dataset.pageNum = pageNum,
             pageContainer.dataset.pageState = "placeholder";
@@ -299,8 +307,6 @@
             const viewport = page.getViewport({ scale: scale, dontFlip: !1 });
             const canvas = document.createElement("canvas");
             canvas.width = viewport.width, canvas.height = viewport.height,
-            canvas.style.width = viewport.width + "px",
-            canvas.style.height = viewport.height + "px",
             canvas.crossOrigin = "anonymous", canvas.style.zIndex = "1";
             const context = canvas.getContext("2d");
             await page.render({ canvasContext: context, viewport: viewport }).promise;
@@ -316,12 +322,10 @@
             const viewport = page.getViewport({ scale: scale, dontFlip: !1 });
             const canvas = document.createElement("canvas");
             canvas.width = viewport.width, canvas.height = viewport.height,
-            canvas.style.width = viewport.width + "px",
-            canvas.style.height = viewport.height + "px",
             canvas.crossOrigin = "anonymous", canvas.style.zIndex = "1";
             const context = canvas.getContext("2d"), pageContainer = document.createElement("div");
             pageContainer.classList.add("ocr-container"), pageContainer.style.position = "relative",
-            pageContainer.style.display = "inline-block", await page.render({
+            pageContainer.style.width = "100%", await page.render({
                 canvasContext: context, viewport: viewport
             }).promise;
             const textPage = await page.getTextContent();
@@ -534,6 +538,7 @@
             document.getElementById("translationContainer").classList.remove("hidden");
             const box = document.getElementById("translationFeedbackBox");
             setTimeout(() => {
+                if (!box || !box.parentElement) return;
                 box.classList.add("fade-out"), box.addEventListener("animationend", () => {
                     box.remove(), document.getElementById("translationContainer").classList.remove("hidden");
                 });
@@ -568,14 +573,24 @@
                 translationPaused && (ImmUtils.resumeTranslation(BaseUIManager.showNotification, this.updateFeedback), 
                 resumeBtn.disabled = !0, pauseBtn.disabled = !1);
             }), cancelBtn.addEventListener("click", () => {
-                translationCanceled || (ImmUtils.cancelTranslation(BaseUIManager.showNotification, this.updateFeedback), 
-                pauseBtn.disabled = !0, resumeBtn.disabled = !0, cancelBtn.disabled = !0, this.removeFeedback(0), 
+                translationCanceled || (ImmUtils.cancelTranslation(BaseUIManager.showNotification, this.updateFeedback),
+                this._translationStopped = !0,
+                pauseBtn.disabled = !0, resumeBtn.disabled = !0, cancelBtn.disabled = !0, this.removeFeedback(0),
                 download && (document.getElementById("downloadPdf").disabled = !1), document.querySelectorAll(".text-spinner, .text-retry-button").forEach(el => el.remove()),
                 document.querySelectorAll(".ocr-box").forEach(box => {
+                    if (box.querySelector(":scope > .spinner")) return void box.remove();
                     const info = box.getAttribute("data-ocr-info");
                     if (!info) return void box.remove();
-                    try { const d = JSON.parse(info); d.translatedText && "" !== d.translatedText || box.remove(); } catch (e) { box.remove(); }
-                }));
+                    try { const d = JSON.parse(info); d.translatedText && "" !== d.translatedText && "[[ERROR]]" !== d.translatedText || box.remove(); } catch (e) { box.remove(); }
+                }),
+                setTimeout(() => {
+                    document.querySelectorAll(".ocr-box").forEach(box => {
+                        if (box.querySelector(":scope > .spinner")) return void box.remove();
+                        const info = box.getAttribute("data-ocr-info");
+                        if (!info) return void box.remove();
+                        try { const d = JSON.parse(info); d.translatedText && "" !== d.translatedText && "[[ERROR]]" !== d.translatedText || box.remove(); } catch (e) { box.remove(); }
+                    });
+                }, 500));
             }), controlContainer.appendChild(pauseBtn), controlContainer.appendChild(resumeBtn),
             controlContainer.appendChild(cancelBtn), controlContainer;
         }
@@ -629,6 +644,7 @@
             document.getElementById("translationContainer").classList.remove("hidden");
             const box = document.getElementById("translationFeedbackBox");
             setTimeout(() => {
+                if (!box || !box.parentElement) return;
                 box.classList.add("fade-out"), box.addEventListener("animationend", () => {
                     box.remove(), document.getElementById("translationContainer").classList.remove("hidden");
                 });
@@ -763,31 +779,22 @@
             });
         }
         applyZoom() {
-            const pdf_viewer = document.getElementById("pdf-viewer");
-            if (!pdf_viewer) return;
-            const viewerRect = pdf_viewer.getBoundingClientRect(), visibleLeft = Math.max(viewerRect.left, 0), visibleTop = Math.max(viewerRect.top, 0), visibleCenterX = (visibleLeft + Math.min(viewerRect.right, window.innerWidth)) / 2, visibleCenterY = (visibleTop + Math.min(viewerRect.bottom, window.innerHeight)) / 2, viewportCenterX = window.scrollX + visibleCenterX, viewportCenterY = window.scrollY + visibleCenterY, viewerLeft = viewerRect.left + window.scrollX, viewerTop = viewerRect.top + window.scrollY, relativeCenterX = viewportCenterX - viewerLeft, relativeCenterY = viewportCenterY - viewerTop, oldZoom = this.zoomFactorOld || 1, newZoom = this.zoomFactor, contentX = relativeCenterX / oldZoom, contentY = relativeCenterY / oldZoom;
-            if (pdf_viewer.style.transition = "transform 0.05s ease", newZoom < 1) {
-                this.currentPageIndex;
-                pdf_viewer.style.transformOrigin = "top center", pdf_viewer.style.transform = `scale(${newZoom})`;
-                const newCenterY = viewerTop + contentY * newZoom, newScrollY = (window.innerWidth, 
-                newCenterY - window.innerHeight / 2);
-                window.scrollTo({
-                    top: newScrollY
-                });
-            } else {
-                pdf_viewer.style.transformOrigin = "top left", pdf_viewer.style.transform = `scale(${newZoom})`;
-                const newCenterY = viewerTop + contentY * newZoom, newScrollX = viewerLeft + contentX * newZoom - window.innerWidth / 2, newScrollY = newCenterY - window.innerHeight / 2;
-                window.scrollTo({
-                    left: newScrollX,
-                    top: newScrollY
-                });
-            }
-            this.zoomFactorOld = newZoom;
+            const pdfContainer = document.getElementById("pdf-container");
+            if (!pdfContainer || !this.baseWidth) return;
+            const scrollRatio = window.scrollY / Math.max(document.documentElement.scrollHeight - window.innerHeight, 1);
+            pdfContainer.style.width = (this.baseWidth * this.zoomFactor) + "px";
+            requestAnimationFrame(() => {
+                const newMaxScroll = document.documentElement.scrollHeight - window.innerHeight;
+                window.scrollTo({top: scrollRatio * newMaxScroll});
+                this._adjustAllFontSizes();
+            });
         }
-        updateOcrBoxesForZoom(container) {
-            if (0 === container.querySelectorAll(".ocr-box").length) return;
-            const canvas = container.querySelector("canvas");
-            canvas && OCRStrategy.updateOverlay(canvas, null, null);
+        _adjustAllFontSizes() {
+            this.pageContainers.forEach(container => {
+                container.querySelectorAll(".ocr-box").forEach(box => {
+                    try { OCRStrategy.adjustFontSize(box); } catch(e) {}
+                });
+            });
         }
         zoomIn() {
             this.zoomFactor < this.maxZoom && (this.zoomFactor = Math.min(this.maxZoom, this.zoomFactor + this.zoomStep), 
@@ -855,6 +862,12 @@
                 rootMargin: "0px"
             });
             this.pageContainers = [];
+            const firstPage = await pdfDoc.getPage(1);
+            const initScale = Math.min(window.devicePixelRatio || 1, 2);
+            const initViewport = firstPage.getViewport({ scale: initScale, dontFlip: !1 });
+            const pdfContainer = document.getElementById("pdf-container");
+            this.baseWidth = Math.min(initViewport.width, pdfContainer ? pdfContainer.parentElement.clientWidth : window.innerWidth);
+            pdfContainer && (pdfContainer.style.width = this.baseWidth + "px");
             for (let pageNum = 1; pageNum <= this.totalPages; pageNum++) {
                 const container = await ProcessPdfPageFacede.createPlaceholder(pdfDoc, pageNum);
                 this.pageContainers.push(container), pageTrackingObserver.observe(container);
@@ -978,7 +991,7 @@
                 if ("rendered" === container.dataset.pageState) {
                     if (container._translationCache) {
                         this._applyCachedTranslation(container);
-                    } else {
+                    } else if (!this._translationStopped && !ImmUtils.isCancelled()) {
                         this._createPreviewBoxes(container);
                     }
                 }
@@ -1002,11 +1015,7 @@
             const blocks = OCRStrategy.groupOcrData(rawOcrData, 18);
             if (0 === blocks.length) return;
             canvas.ocrBaseWidth = canvas.width, canvas.ocrBaseHeight = canvas.height;
-            const canvasRect = canvas.getBoundingClientRect(), containerRect = container.getBoundingClientRect();
-            const baseWidth = canvas.ocrBaseWidth || canvasRect.width;
-            const pdfZoom = this.zoomFactor || 1;
-            const zoomFactor = canvasRect.width / baseWidth / pdfZoom;
-            const offsetX = (canvasRect.left - containerRect.left) / pdfZoom, offsetY = (canvasRect.top - containerRect.top) / pdfZoom;
+            const baseWidth = canvas.ocrBaseWidth, baseHeight = canvas.ocrBaseHeight;
             const boxesVisible = translationActive;
             const fragment = document.createDocumentFragment();
             blocks.forEach((block, i) => {
@@ -1017,10 +1026,10 @@
                 box.setAttribute("data-ocr-info", JSON.stringify(block));
                 if (!boxesVisible) box.style.display = "none";
                 const {bbox, baseline} = block;
-                const x = offsetX + bbox.x0 * zoomFactor, y = offsetY + bbox.y0 * zoomFactor;
-                const w = (bbox.x1 - bbox.x0) * zoomFactor, h = (bbox.y1 - bbox.y0) * zoomFactor;
-                box.style.setProperty("--pos-x", `${x}px`), box.style.setProperty("--pos-y", `${y}px`),
-                box.style.setProperty("--box-width", `${w}px`), box.style.setProperty("--box-height", `${h}px`);
+                box.style.setProperty("--pos-x", `${(bbox.x0 / baseWidth) * 100}%`),
+                box.style.setProperty("--pos-y", `${(bbox.y0 / baseHeight) * 100}%`),
+                box.style.setProperty("--box-width", `${((bbox.x1 - bbox.x0) / baseWidth) * 100}%`),
+                box.style.setProperty("--box-height", `${((bbox.y1 - bbox.y0) / baseHeight) * 100}%`);
                 this._applyRotationFromBaseline(box, bbox, baseline);
                 const spinner = document.createElement("div");
                 spinner.className = "spinner", box.appendChild(spinner);
@@ -1053,6 +1062,7 @@
             box.dataset.rotation = angleDeg, box.style.transform = rotationTransform;
         }
         _applyCachedTranslation(container) {
+            if (this._translationStopped && !container._translationCache) return;
             const cache = container._translationCache;
             if (!cache || !cache.blocks || 0 === cache.blocks.length) return;
             const canvas = container.querySelector("canvas");
@@ -1065,11 +1075,7 @@
             canvas.ocrBaseWidth = canvas.width, canvas.ocrBaseHeight = canvas.height,
             canvas.dataset.ocrProcessed = "true", container.dataset.pageState = "translated";
             if (this.ocrManager) canvas.ocrTranslator = this.ocrManager.getTranslatorService();
-            const canvasRect = canvas.getBoundingClientRect(), containerRect = container.getBoundingClientRect();
-            const baseWidth = canvas.ocrBaseWidth || canvasRect.width;
-            const pdfZoom = this.zoomFactor || 1;
-            const zoomFactor = canvasRect.width / baseWidth / pdfZoom;
-            const offsetX = (canvasRect.left - containerRect.left) / pdfZoom, offsetY = (canvasRect.top - containerRect.top) / pdfZoom;
+            const baseWidth = canvas.ocrBaseWidth, baseHeight = canvas.ocrBaseHeight;
             const boxesVisible = translationActive;
             const fragment = document.createDocumentFragment();
             const createdBoxes = [];
@@ -1088,15 +1094,12 @@
                         e.preventDefault(), box.remove();
                     }
                 }, box.addEventListener("beforeinput", box._beforeinputHandler);
-                box.dataset.lastOffsetX = offsetX, box.dataset.lastOffsetY = offsetY, box.dataset.lastZoomFactor = zoomFactor;
                 if (!boxesVisible) box.style.display = "none";
                 const {bbox, baseline, translatedText} = block;
-                const x = offsetX + bbox.x0 * zoomFactor, y = offsetY + bbox.y0 * zoomFactor;
-                const w = (bbox.x1 - bbox.x0) * zoomFactor, h = (bbox.y1 - bbox.y0) * zoomFactor;
-                box.style.setProperty("--pos-x", `${x}px`), box.style.setProperty("--pos-y", `${y}px`),
-                box.style.setProperty("--box-width", `${w}px`), box.style.setProperty("--box-height", `${h}px`),
-                box.style.setProperty("--zoom-factor", `${zoomFactor}`),
-                box.style.setProperty("--offset-x", `${offsetX}px`), box.style.setProperty("--offset-y", `${offsetY}px`);
+                box.style.setProperty("--pos-x", `${(bbox.x0 / baseWidth) * 100}%`),
+                box.style.setProperty("--pos-y", `${(bbox.y0 / baseHeight) * 100}%`),
+                box.style.setProperty("--box-width", `${((bbox.x1 - bbox.x0) / baseWidth) * 100}%`),
+                box.style.setProperty("--box-height", `${((bbox.y1 - bbox.y0) / baseHeight) * 100}%`);
                 if (block._cachedStyles) {
                     const s = block._cachedStyles;
                     s.background && (box.style.background = s.background);
@@ -1321,16 +1324,17 @@
                 return;
             }
             let currentIndex = 0;
+            const baseW = element.ocrBaseWidth || element.width, baseH = element.ocrBaseHeight || element.height;
             function updateBox(box, data, boxIndex) {
-                if (!box) return;
+                if (!box || !box.parentElement || ImmUtils.isCancelled()) return;
                 const html = box.innerHTML.trim(), {bbox: bbox, translatedText: translatedText, baseline: baseline} = data;
-                let x, y, boxWidth, boxHeight;
-                if (x = offsetX + bbox.x0 * zoomFactor, y = offsetY + bbox.y0 * zoomFactor, boxWidth = (bbox.x1 - bbox.x0) * zoomFactor, 
-                boxHeight = (bbox.y1 - bbox.y0) * zoomFactor, box.dataset.lastOffsetX = offsetX, 
-                box.dataset.lastOffsetY = offsetY, box.dataset.lastZoomFactor = zoomFactor, requestAnimationFrame(() => {
-                    box.style.setProperty("--pos-x", `${x}px`), box.style.setProperty("--pos-y", `${y}px`), 
-                    box.style.setProperty("--box-width", `${boxWidth}px`), box.style.setProperty("--box-height", `${boxHeight}px`), 
-                    box.style.setProperty("--zoom-factor", `${zoomFactor}`), box.style.setProperty("--offset-x", `${offsetX}px`), 
+                const xPct = (bbox.x0 / baseW) * 100, yPct = (bbox.y0 / baseH) * 100,
+                    wPct = ((bbox.x1 - bbox.x0) / baseW) * 100, hPct = ((bbox.y1 - bbox.y0) / baseH) * 100;
+                if (box.dataset.lastOffsetX = offsetX, box.dataset.lastOffsetY = offsetY,
+                box.dataset.lastZoomFactor = zoomFactor, requestAnimationFrame(() => {
+                    box.style.setProperty("--pos-x", `${xPct}%`), box.style.setProperty("--pos-y", `${yPct}%`),
+                    box.style.setProperty("--box-width", `${wPct}%`), box.style.setProperty("--box-height", `${hPct}%`),
+                    box.style.setProperty("--zoom-factor", `${zoomFactor}`), box.style.setProperty("--offset-x", `${offsetX}px`),
                     box.style.setProperty("--offset-y", `${offsetY}px`);
                 }), -1 === boxIndex && (html.includes('class="spinner"') || html.includes("ocr-retry-btn"))) return;
                 if (translatedText && "" !== translatedText) if ("[[ERROR]]" === translatedText) {
@@ -1354,9 +1358,9 @@
                     box.style.cursor = "default", box.contentEditable = "false";
                 }
                 if (-1 === boxIndex && "" !== html && !html.includes('class="spinner"') && !html.includes("ocr-retry-btn")) {
-                    try {
-                        OCRStrategy.adjustFontSize(box);
-                    } catch (e) {}
+                    requestAnimationFrame(() => {
+                        try { OCRStrategy.adjustFontSize(box); } catch (e) {}
+                    });
                     return;
                 }
                 let angleDeg = 0, isVertical = !1, dx = 0, dy = 0;
@@ -1381,13 +1385,14 @@
                 } catch (e) {}
             }
             requestAnimationFrame(function updateChunk() {
+                if (ImmUtils.isCancelled()) return;
                 for (let j = 0; j < 5 && currentIndex < boxes.length; j++, currentIndex++) {
                     let b = boxes[currentIndex];
                     const d = b?.getAttribute("data-ocr-info");
                     if (!d) continue;
                     updateBox(b, JSON.parse(d), -1);
                 }
-                currentIndex < boxes.length && setTimeout(updateChunk, 50);
+                currentIndex < boxes.length && !ImmUtils.isCancelled() && setTimeout(updateChunk, 50);
             });
         }
         static updateOverlay(element, corsFreeCanvas = null, iElementData = null, translator = null) {
@@ -1397,26 +1402,14 @@
                 const boxes = Array.from(container.querySelectorAll(".ocr-box")).sort((a, b) => parseInt(a.getAttribute("data-ocr-index"), 10) - parseInt(b.getAttribute("data-ocr-index"), 10));
                 if (0 === boxes.length) return;
                 const canvasRect = element.getBoundingClientRect(), containerRect = container.getBoundingClientRect(), baseWidth = element.ocrBaseWidth || canvasRect.width;
-                let pdfZoomFactor = 0;
-                const pdfViewer = document.getElementById("pdf-viewer");
-                if (pdfOCR && pdfViewer && pdfViewer.style.transform) {
-                    const match = pdfViewer.style.transform.match(/scale\(([\d.]+)\)/);
-                    match && match[1] && (pdfZoomFactor = parseFloat(match[1]));
-                }
-                let zoomFactor = pdfZoomFactor > 0 ? canvasRect.width / baseWidth / pdfZoomFactor : canvasRect.width / baseWidth;
+                let zoomFactor = canvasRect.width / baseWidth;
                 const offsetX = canvasRect.left - containerRect.left, offsetY = canvasRect.top - containerRect.top;
                 let lastTranslatedIndex = -1;
-                return iElementData >= 0 && (lastTranslatedIndex = iElementData), OCRStrategy.enableDragResizeForBoxes(element, corsFreeCanvas), 
+                return iElementData >= 0 && (lastTranslatedIndex = iElementData), OCRStrategy.enableDragResizeForBoxes(element, corsFreeCanvas),
                 void OCRStrategy.updateBoxesInChunks(element, boxes, offsetX, offsetY, zoomFactor, corsFreeCanvas, lastTranslatedIndex, translator);
             }
             const canvasRect = element.getBoundingClientRect(), containerRect = container.getBoundingClientRect(), baseWidth = element.ocrBaseWidth || canvasRect.width;
-            let pdfZoomFactor = 0;
-            const pdfViewer = document.getElementById("pdf-viewer");
-            if (pdfOCR && pdfViewer && pdfViewer.style.transform) {
-                const match = pdfViewer.style.transform.match(/scale\(([\d.]+)\)/);
-                match && match[1] && (pdfZoomFactor = parseFloat(match[1]));
-            }
-            let zoomFactor = pdfZoomFactor > 0 ? canvasRect.width / baseWidth / pdfZoomFactor : canvasRect.width / baseWidth;
+            let zoomFactor = canvasRect.width / baseWidth;
             const offsetX = canvasRect.left - containerRect.left, offsetY = canvasRect.top - containerRect.top;
             let boxes = container._ocrBoxes || [];
             if (boxes.length < element.ocrData.length) {
@@ -1467,29 +1460,29 @@
         static initSingleBoxDragResize(box, img, cnt, canvas = null) {
             if (OCRStrategy._initializedBoxes.has(box)) return;
             const container = cnt, baseWidth = img.ocrBaseWidth || img.naturalWidth || img.width, containerRect = container.getBoundingClientRect(), imgRect = img.getBoundingClientRect(), offsetX = imgRect.left - containerRect.left, offsetY = imgRect.top - containerRect.top;
-            let pdfZoomFactor = 0;
-            const pdfViewer = document.getElementById("pdf-viewer");
-            if (pdfOCR && pdfViewer && pdfViewer.style.transform) {
-                const match = pdfViewer.style.transform.match(/scale\(([\d.]+)\)/);
-                match && match[1] && (pdfZoomFactor = parseFloat(match[1]));
-            }
-            let zoomFactor = pdfZoomFactor > 0 ? imgRect.width / baseWidth / pdfZoomFactor : imgRect.width / baseWidth;
+            const zoomFactor = imgRect.width / baseWidth;
             OCRStrategy._initBoxHandlers(box, img, canvas, offsetX, offsetY, zoomFactor);
         }
         static enableDragResizeForBoxes(img, canvas = null) {
             const container = img.parentElement, boxes = container.querySelectorAll(".ocr-box"), baseWidth = img.ocrBaseWidth || img.naturalWidth || img.width, containerRect = container.getBoundingClientRect(), imgRect = img.getBoundingClientRect(), offsetX = imgRect.left - containerRect.left, offsetY = imgRect.top - containerRect.top;
-            let pdfZoomFactor = 0;
-            const pdfViewer = document.getElementById("pdf-viewer");
-            if (pdfOCR && pdfViewer && pdfViewer.style.transform) {
-                const match = pdfViewer.style.transform.match(/scale\(([\d.]+)\)/);
-                match && match[1] && (pdfZoomFactor = parseFloat(match[1]));
-            }
-            let zoomFactor;
-            zoomFactor = pdfZoomFactor > 0 ? imgRect.width / baseWidth / pdfZoomFactor : imgRect.width / baseWidth,
+            const zoomFactor = imgRect.width / baseWidth;
             boxes.forEach(box => {
                 if (OCRStrategy._initializedBoxes.has(box)) return;
                 OCRStrategy._initBoxHandlers(box, img, canvas, offsetX, offsetY, zoomFactor);
             });
+        }
+        static _convertBoxToPercentages(box, img) {
+            const parent = box.parentElement;
+            if (!parent) return;
+            const parentW = parent.clientWidth, parentH = parent.clientHeight;
+            if (!parentW || !parentH) return;
+            const computed = getComputedStyle(box);
+            const left = parseFloat(computed.left) || 0, top = parseFloat(computed.top) || 0,
+                width = parseFloat(computed.width) || 0, height = parseFloat(computed.height) || 0;
+            box.style.setProperty("--pos-x", `${(left / parentW) * 100}%`);
+            box.style.setProperty("--pos-y", `${(top / parentH) * 100}%`);
+            box.style.setProperty("--box-width", `${(width / parentW) * 100}%`);
+            box.style.setProperty("--box-height", `${(height / parentH) * 100}%`);
         }
         static _initBoxHandlers(box, img, canvas, offsetX, offsetY, zoomFactor) {
             if (OCRStrategy._initializedBoxes.has(box)) return;
@@ -1556,8 +1549,8 @@
                             pdfContainer && (pdfContainer.classList.remove("dragging"), pdfContainer.removeEventListener("touchmove", preventDefault, {
                                 passive: !1
                             }));
-                        }(), isDragging = !1, updatePending && (OCRStrategy.updateBoxOcrData(box, offsetX, offsetY, zoomFactor, img, canvas), 
-                        updatePending = !1);
+                        }(), isDragging = !1, updatePending && (OCRStrategy.updateBoxOcrData(box, offsetX, offsetY, zoomFactor, img, canvas),
+                        OCRStrategy._convertBoxToPercentages(box, img), updatePending = !1);
                         let textElement = box.getElementsByClassName("ocr-box-text")[0];
                         textElement && (textElement.contentEditable = "true", textElement.blur()), box.blur(), 
                         e.preventDefault(), e.stopPropagation(), currentDraggingBox = null;
@@ -1599,8 +1592,8 @@
                     function endResize(e) {
                         isResizing && (isResizing = !1, document.removeEventListener("mousemove", onResize), 
                         document.removeEventListener("touchmove", onResize), document.removeEventListener("mouseup", endResize), 
-                        document.removeEventListener("touchend", endResize), updateNeeded && (OCRStrategy.updateBoxOcrData(box, offsetX, offsetY, zoomFactor, img, canvas, !0), 
-                        updateNeeded = !1));
+                        document.removeEventListener("touchend", endResize), updateNeeded && (OCRStrategy.updateBoxOcrData(box, offsetX, offsetY, zoomFactor, img, canvas, !0),
+                        OCRStrategy._convertBoxToPercentages(box, img), updateNeeded = !1));
                     }
                     handle._resizeHandlers && (document.removeEventListener("mousemove", handle._resizeHandlers.mousemove), 
                     document.removeEventListener("touchmove", handle._resizeHandlers.touchmove), document.removeEventListener("mouseup", handle._resizeHandlers.mouseup), 
@@ -2376,6 +2369,7 @@
                                 }
                             })());
                             await Promise.all(translationPromises);
+                            if (ImmUtils.isCancelled()) return;
                             pageContainers[idx]._translationCache = { blocks: blocks };
                             if ("rendered" === pageContainers[idx].dataset.pageState || "translated" === pageContainers[idx].dataset.pageState) {
                                 this.uiManager._applyCachedTranslation(pageContainers[idx]);
@@ -2391,7 +2385,7 @@
                                 this.uiManager._renderingPages.delete(pageNum);
                             }
                         }
-                        if ("rendered" === ocrContainer.dataset.pageState || "translated" === ocrContainer.dataset.pageState) {
+                        if (!ImmUtils.isCancelled() && ("rendered" === ocrContainer.dataset.pageState || "translated" === ocrContainer.dataset.pageState)) {
                             const canvas = ocrContainer.querySelector("canvas");
                             if (canvas) {
                                 this.uiManager._renderingPages.add(pageNum);
@@ -2413,6 +2407,7 @@
                     await ImmUtils.yieldControl();
                 };
                 for (const idx of translationOrder) {
+                    if (ImmUtils.isCancelled()) break;
                     await translatePage(idx);
                 }
                 await this.ocrManager.getOcrEngine().terminateEngine();
@@ -2423,11 +2418,14 @@
         }
         async stop(delay = 0) {
             this.uiManager.removeUI(delay);
+            if (ImmUtils.isCancelled()) return void this.translationService.stopWorker();
             let hasError = !0;
             for (;hasError; ) {
                 hasError = !1;
                 document.querySelectorAll(".ocr-box").forEach(box => {
-                    "[[ERROR]]" === JSON.parse(box.getAttribute("data-ocr-info")).translatedText && (hasError = !0);
+                    const info = box.getAttribute("data-ocr-info");
+                    if (!info) return;
+                    try { "[[ERROR]]" === JSON.parse(info).translatedText && (hasError = !0); } catch(e) {}
                 }), await new Promise(resolve => setTimeout(resolve, 5e3));
             }
             this.translationService.stopWorker();

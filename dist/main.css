@@ -919,9 +919,11 @@
 
 #pdf-viewer {
     position: relative;
-    width: auto;
-    height: 95%;
+    width: 100%;
+    min-height: 95%;
     display: flex;
+    justify-content: center;
+    overflow-x: auto;
     font-family: var(--md-font-family);
 }
 
@@ -1043,14 +1045,14 @@
 
 #pdf-container {
     margin-top: 96px;
-    flex: 1;
+    flex: none;
     display: flex;
     flex-direction: column;
+    align-items: center;
     gap: 20px;
     overflow: visible;
     position: relative;
-    margin: auto;
-    width: 95%;
+    width: 100%;
     font-family: var(--md-font-family);
 }
 
@@ -1461,7 +1463,7 @@
     #pdf-container {
         margin-top: 88px;
         gap: 16px;
-        width: 98%;
+        width: 100%;
     }
 
     #pdf-toolbar #pageIndicator,
@@ -1496,7 +1498,7 @@
     #pdf-container {
         margin-top: 80px;
         gap: 12px;
-        width: 99%;
+        width: 100%;
     }
 
     #pdf-toolbar #pageIndicator,
