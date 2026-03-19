@@ -288,7 +288,7 @@
     class ProcessPdfPageFacede {
         static async createPlaceholder(pdfDoc, pageNum) {
             const page = await pdfDoc.getPage(pageNum);
-            const scale = Math.min(window.devicePixelRatio || 1, 2);
+            const scale = Math.max(window.devicePixelRatio || 1, 2);
             const viewport = page.getViewport({ scale: scale, dontFlip: !1 });
             const pageContainer = document.createElement("div");
             pageContainer.classList.add("ocr-container"), pageContainer.style.position = "relative",
@@ -303,7 +303,7 @@
             if ("placeholder" !== container.dataset.pageState) return container;
             container.dataset.pageState = "rendering";
             const page = await pdfDoc.getPage(pageNum);
-            const scale = Math.min(window.devicePixelRatio || 1, 2);
+            const scale = Math.max(window.devicePixelRatio || 1, 2);
             const viewport = page.getViewport({ scale: scale, dontFlip: !1 });
             const canvas = document.createElement("canvas");
             canvas.width = viewport.width, canvas.height = viewport.height,
@@ -318,7 +318,7 @@
         }
         static async processPage(pdfDoc, pageNum) {
             const page = await pdfDoc.getPage(pageNum);
-            const scale = Math.min(window.devicePixelRatio || 1, 2);
+            const scale = Math.max(window.devicePixelRatio || 1, 2);
             const viewport = page.getViewport({ scale: scale, dontFlip: !1 });
             const canvas = document.createElement("canvas");
             canvas.width = viewport.width, canvas.height = viewport.height,
@@ -590,7 +590,12 @@
                         if (!info) return void box.remove();
                         try { const d = JSON.parse(info); d.translatedText && "" !== d.translatedText && "[[ERROR]]" !== d.translatedText || box.remove(); } catch (e) { box.remove(); }
                     });
-                }, 500));
+                }, 500),
+                this.pageContainers && this.pageContainers.forEach(c => {
+                    if (!c._translationCache) return;
+                    const valid = c._translationCache.blocks.filter(b => b && b.translatedText && "" !== b.translatedText && "[[ERROR]]" !== b.translatedText);
+                    valid.length > 0 ? c._translationCache = { blocks: valid } : delete c._translationCache;
+                }));
             }), controlContainer.appendChild(pauseBtn), controlContainer.appendChild(resumeBtn),
             controlContainer.appendChild(cancelBtn), controlContainer;
         }
@@ -943,6 +948,7 @@
                 const blocks = ocrBoxes.map(box => {
                     try {
                         const data = JSON.parse(box.getAttribute("data-ocr-info"));
+                        if (!data.translatedText || "" === data.translatedText || "[[ERROR]]" === data.translatedText) return null;
                         data._cachedStyles = {
                             background: box.style.background,
                             color: box.style.color,
@@ -2335,7 +2341,7 @@
                 this.uiManager.ocrManager = this.ocrManager;
                 let pageContainers = await this.uiManager.createPdfPages(pdfDoc);
                 if (pageContainers.length !== totalPages) throw new Error("Errore nella creazione delle pagine PDF.");
-                const scale = Math.min(window.devicePixelRatio || 1, 2);
+                const scale = Math.max(window.devicePixelRatio || 1, 2);
                 const translator = this.ocrManager.getTranslatorService();
                 const renderedIndices = [], otherIndices = [];
                 for (let i = 0; i < pageContainers.length; i++) {
