@@ -1311,6 +1311,7 @@
         }
         static updateBoxesInChunks(element, boxes, offsetX = 0, offsetY = 0, zoomFactor = 1, corsFreeCanvas, lastTranslatedIndex, translator = null) {
             const currTranslator = translator || element.ocrTranslator;
+            const baseW = element.ocrBaseWidth || element.width, baseH = element.ocrBaseHeight || element.height;
             if (1 === boxes.length) {
                 let b = boxes[0];
                 const data = b?.getAttribute("data-ocr-info");
@@ -1330,7 +1331,6 @@
                 return;
             }
             let currentIndex = 0;
-            const baseW = element.ocrBaseWidth || element.width, baseH = element.ocrBaseHeight || element.height;
             function updateBox(box, data, boxIndex) {
                 if (!box || !box.parentElement || ImmUtils.isCancelled()) return;
                 const html = box.innerHTML.trim(), {bbox: bbox, translatedText: translatedText, baseline: baseline} = data;
@@ -1903,10 +1903,16 @@
                 });
             } catch (error) {}
             let container = img.parentElement;
-            container.classList.contains("ocr-container") || (container = document.createElement("div"), 
-            container.classList.add("ocr-container"), container.style.position = "relative", 
-            container.style.display = "flex", img.parentElement.insertBefore(container, img), 
-            container.appendChild(img));
+            if (!container.classList.contains("ocr-container")) {
+                const imgPos = getComputedStyle(img).position;
+                "absolute" === imgPos || "fixed" === imgPos
+                    ? (container.classList.add("ocr-container"),
+                       "static" === getComputedStyle(container).position && (container.style.position = "relative"))
+                    : (container = document.createElement("div"),
+                       container.classList.add("ocr-container"), container.style.position = "relative",
+                       container.style.display = "inline-block", img.parentElement.insertBefore(container, img),
+                       container.appendChild(img));
+            }
             const originalWidth = imageForOCR.naturalWidth, originalHeight = imageForOCR.naturalHeight;
             img.ocrBaseWidth = originalWidth, img.ocrBaseHeight = originalHeight;
             const tempCanvas = document.createElement("canvas");
