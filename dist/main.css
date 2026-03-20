@@ -64,7 +64,7 @@
     --md-shadow-12: 0px 7px 8px -4px rgba(0,0,0,0.2), 0px 12px 17px 2px rgba(0,0,0,0.14), 0px 5px 22px 4px rgba(0,0,0,0.12);
 
     /* Typography */
-    --md-font-family: 'Roboto', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    --md-font-family: "Roboto", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     --md-font-weight-light: 300;
     --md-font-weight-regular: 400;
     --md-font-weight-medium: 500;
@@ -482,7 +482,7 @@
 }
 
 .immTransl-control-btn::before {
-    content: '';
+    content: "";
     position: absolute;
     top: 0;
     left: 0;
@@ -651,7 +651,7 @@
 }
 
 .text-retry-button::before {
-    content: '';
+    content: "";
     position: absolute;
     top: 0;
     left: 0;
@@ -756,7 +756,7 @@
 .ocr-overlay {
     position: absolute !important;
     color: #fff !important;
-    font-family: 'Helvetica Neue', Arial, sans-serif !important;
+    font-family: "Helvetica Neue", Arial, sans-serif !important;
     text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6) !important;
     padding: 4px 8px !important;
     border-radius: 0px !important;
@@ -776,9 +776,7 @@
     top: var(--pos-y, 0);
     width: var(--box-width, auto);
     height: var(--box-height, auto);
-    transition: left 0.05s ease, top 0.05s ease;
     background: linear-gradient(135deg, rgba(44, 62, 80, 0.95), rgba(52, 73, 94, 0.85));
-    box-shadow: 8px 8px 11px rgba(0, 0, 0, 0.1), 0 1px 2px rgba(0, 0, 0, 0.1) !important;
     color: rgb(255, 255, 255);
     font-weight: 400 !important;
     display: flex;
@@ -786,8 +784,6 @@
     align-items: center !important;
     flex-direction: column !important;
     -webkit-overflow-scrolling: touch;
-    backdrop-filter: blur(40px) !important;
-    -webkit-backdrop-filter: blur(40px) !important;
     hyphens: auto !important;
     -webkit-hyphens: auto !important;
     line-height: 1.2em !important;
@@ -796,18 +792,13 @@
     word-wrap: break-word !important;
     letter-spacing: normal !important;
     border-radius: 8px !important;
-    /*font-size: clamp(2px, 1vw, 10px) !important;*/
-    font-family: 'Helvetica Neue', Arial, sans-serif !important;
+    font-family: "Helvetica Neue", Arial, sans-serif !important;
     text-align: left !important;
     padding: 2px 4px !important;
     overflow: auto !important;
     white-space: normal !important;
-    /*pointer-events: none !important;*/
     z-index: 9999 !important;
-
-    /*
-    container-type: size;
-    resize: both;*/
+    contain: layout style paint;
 }
 
 .ocr-box-text {
@@ -928,9 +919,11 @@
 
 #pdf-viewer {
     position: relative;
-    width: auto;
-    height: 95%;
+    width: 100%;
+    min-height: 95%;
     display: flex;
+    justify-content: center;
+    overflow-x: auto;
     font-family: var(--md-font-family);
 }
 
@@ -979,7 +972,7 @@
 }
 
 #pdf-toolbar button::before {
-    content: '';
+    content: "";
     position: absolute;
     top: 0;
     left: 0;
@@ -1052,14 +1045,14 @@
 
 #pdf-container {
     margin-top: 96px;
-    flex: 1;
+    flex: none;
     display: flex;
     flex-direction: column;
+    align-items: center;
     gap: 20px;
     overflow: visible;
     position: relative;
-    margin: auto;
-    width: 95%;
+    width: 100%;
     font-family: var(--md-font-family);
 }
 
@@ -1180,7 +1173,7 @@
 }
 
 #pdfOptionsModal input[type="radio"]:checked::before {
-    content: '';
+    content: "";
     position: absolute;
     top: 50%;
     left: 50%;
@@ -1305,7 +1298,7 @@
 }
 
 #pdfOptionsModal button::before {
-    content: '';
+    content: "";
     position: absolute;
     top: 0;
     left: 0;
@@ -1470,7 +1463,7 @@
     #pdf-container {
         margin-top: 88px;
         gap: 16px;
-        width: 98%;
+        width: 100%;
     }
 
     #pdf-toolbar #pageIndicator,
@@ -1505,7 +1498,7 @@
     #pdf-container {
         margin-top: 80px;
         gap: 12px;
-        width: 99%;
+        width: 100%;
     }
 
     #pdf-toolbar #pageIndicator,

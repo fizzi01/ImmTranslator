@@ -18,7 +18,7 @@
             translationPaused = !1, feedbackCallback("Resumed", !0);
         }
         static cancelTranslation(notificationCallback = () => {}, feedbackCallback = () => {}) {
-            translationCanceled = !0, feedbackCallback("Canceled", !1);
+            translationCanceled = !0, translationActive = !1, feedbackCallback("Canceled", !1);
         }
         static translationStatus(isActive) {
             translationActive = isActive;
@@ -157,10 +157,7 @@
             const rect = box.getBoundingClientRect();
             clone.style.writingMode = "horizontal-tb", clone.style.transform = "none", clone.style.width = rect.height + "px", 
             clone.style.height = rect.width + "px", await new Promise(resolve => requestAnimationFrame(resolve));
-            const dataUrl = (await html2canvas(clone, {
-                scale: 2,
-                backgroundColor: null
-            })).toDataURL("image/png", 1);
+            const dataUrl = (await snapdom.toPng(clone, {scale: 2, backgroundColor: "transparent"})).src;
             return offscreen.remove(), {
                 dataUrl: dataUrl,
                 cloneWidth: rect.height,
@@ -171,22 +168,26 @@
             try {
                 const containers = document.querySelectorAll(".ocr-container");
                 if (0 === containers.length) return;
-                const pdfViewer = document.getElementById("pdf-viewer");
-                let currentZoomFactor = 1;
-                if (pdfViewer && pdfViewer.style.transform) {
-                    const match = pdfViewer.style.transform.match(/scale\(([\d.]+)\)/);
-                    match && match[1] && (currentZoomFactor = parseFloat(match[1]));
-                }
-                const firstCanvas = containers[0].querySelector("canvas[data-ocr-processed='true']");
-                if (!firstCanvas) throw new Error("No translations found");
-                pdfViewer.style.transform = "scale(1)";
+                const pdfContainer = document.getElementById("pdf-container");
+                const currentZoomWidth = pdfContainer ? pdfContainer.style.width : "100%";
+                let firstCanvas = containers[0].querySelector("canvas[data-ocr-processed='true']");
+                firstCanvas || (firstCanvas = containers[0].querySelector("canvas"));
+                if (!firstCanvas) throw new Error("No pages found");
+                pdfContainer && (pdfContainer.style.width = firstCanvas.width + "px");
                 const zoomInButton = document.getElementById("zoomIn"), zoomOutButton = document.getElementById("zoomOut");
-                zoomInButton && (zoomInButton.disabled = !0), zoomOutButton && (zoomOutButton.disabled = !0), 
-                await ImmUtils.sleep(500);
+                zoomInButton && (zoomInButton.disabled = !0), zoomOutButton && (zoomOutButton.disabled = !0),
+                await ImmUtils.sleep(300);
+                containers.forEach(c => {
+                    c.querySelectorAll(".ocr-box").forEach(box => {
+                        try { OCRStrategy.adjustFontSize(box); } catch(e) {}
+                    });
+                });
+                await ImmUtils.sleep(100);
                 const pageWidth = firstCanvas.offsetWidth, pageHeight = firstCanvas.offsetHeight, orientation = pageWidth > pageHeight ? "landscape" : "portrait", {jsPDF: jsPDF} = window.jspdf, pdf = new jsPDF({
                     orientation: orientation,
                     unit: "px",
-                    format: [ pageWidth, pageHeight ]
+                    format: [ pageWidth, pageHeight ],
+                    compress: !0
                 });
                 logFunction("⏳ Processing your PDF ⏳", "success");
                 let pagesToProcess = [];
@@ -233,22 +234,28 @@
                             img: img
                         }), box.style.display = "none";
                     }
-                    logFunction(`Preparing translated page ${i + 1}`, "warning");
+                    logFunction(`Preparing page ${i + 1}`, "warning");
                     let originalCanvas = container.querySelector("canvas[data-ocr-processed='true']");
                     originalCanvas || (originalCanvas = container.querySelector("canvas"));
-                    const bgImg = new Image;
-                    bgImg.src = originalCanvas.toDataURL("image/png"), bgImg.style.width = iPageWidth + "px", 
-                    bgImg.style.height = iPageHeight + "px", bgImg.setAttribute("width", iPageWidth), 
-                    bgImg.setAttribute("height", iPageHeight), bgImg.style.position = "absolute", bgImg.style.top = "0", 
-                    bgImg.style.left = "0", bgImg.style.zIndex = "999", bgImg.style.display = "block", 
-                    container.insertBefore(bgImg, container.firstChild);
-                    const imgData = (await html2canvas(container, {
-                        width: iPageWidth,
-                        height: iPageHeight,
-                        windowWidth: iPageWidth,
-                        windowHeight: iPageHeight
-                    })).toDataURL("image/jpeg", options.quality);
-                    bgImg.remove(), container.querySelectorAll(".ocr-box").forEach((box, idx) => {
+                    if (!originalCanvas) {
+                        for (const {box: box, img: img} of tempImages) box.style.display = "", img.remove();
+                        continue;
+                    }
+                    let imgData;
+                    const hasOcrBoxes = container.querySelectorAll(".ocr-box").length > 0;
+                    if (!hasOcrBoxes) {
+                        imgData = originalCanvas.toDataURL("image/jpeg", options.quality);
+                    } else {
+                        const bgImg = new Image;
+                        bgImg.src = originalCanvas.toDataURL("image/png"), bgImg.style.width = iPageWidth + "px",
+                        bgImg.style.height = iPageHeight + "px", bgImg.setAttribute("width", iPageWidth),
+                        bgImg.setAttribute("height", iPageHeight), bgImg.style.position = "absolute", bgImg.style.top = "0",
+                        bgImg.style.left = "0", bgImg.style.zIndex = "999", bgImg.style.display = "block",
+                        container.insertBefore(bgImg, container.firstChild);
+                        imgData = (await snapdom.toJpg(container, {quality: options.quality})).src;
+                        bgImg.remove();
+                    }
+                    container.querySelectorAll(".ocr-box").forEach((box, idx) => {
                         const backup = backupStyles[idx];
                         if (!backup) return;
                         box.style.background = backup.background, box.style.backgroundColor = backup.backgroundColor, 
@@ -260,9 +267,16 @@
                     for (const {box: box, img: img} of tempImages) box.style.display = "", img.remove();
                     index > 0 && (pdf.addPage([ iPageWidth, iPageHeight ], iOrientation), pdf.internal.pageSize.width = iPageWidth, 
                     pdf.internal.pageSize.height = iPageHeight, pdf.internal.pageSize.orientation = iOrientation), 
-                    pdf.addImage(imgData, "JPEG", 0, 0, iPageWidth, iPageHeight), await new Promise(resolve => setTimeout(resolve, 500));
+                    pdf.addImage(imgData, "JPEG", 0, 0, iPageWidth, iPageHeight), await new Promise(resolve => setTimeout(resolve, 50));
                 }
-                pdfViewer.style.transform = "scale(" + currentZoomFactor + ")", zoomInButton && (zoomInButton.disabled = !1), 
+                pdfContainer && (pdfContainer.style.width = currentZoomWidth);
+                await ImmUtils.sleep(100);
+                containers.forEach(c => {
+                    c.querySelectorAll(".ocr-box").forEach(box => {
+                        try { OCRStrategy.adjustFontSize(box); } catch(e) {}
+                    });
+                });
+                zoomInButton && (zoomInButton.disabled = !1),
                 zoomOutButton && (zoomOutButton.disabled = !1), logFunction("PDF Ready ✅", "success");
                 const name = fileName || "PDF";
                 pdf.save(`${name}_translated.pdf`);
@@ -272,28 +286,52 @@
         }
     }
     class ProcessPdfPageFacede {
+        static async createPlaceholder(pdfDoc, pageNum) {
+            const page = await pdfDoc.getPage(pageNum);
+            const scale = Math.max(window.devicePixelRatio || 1, 2);
+            const viewport = page.getViewport({ scale: scale, dontFlip: !1 });
+            const pageContainer = document.createElement("div");
+            pageContainer.classList.add("ocr-container"), pageContainer.style.position = "relative",
+            pageContainer.style.width = "100%",
+            pageContainer.style.aspectRatio = viewport.width + " / " + viewport.height,
+            pageContainer.style.background = "#fafafa",
+            pageContainer.dataset.pageNum = pageNum,
+            pageContainer.dataset.pageState = "placeholder";
+            return document.getElementById("pdf-container").appendChild(pageContainer), pageContainer;
+        }
+        static async renderPage(pdfDoc, pageNum, container) {
+            if ("placeholder" !== container.dataset.pageState) return container;
+            container.dataset.pageState = "rendering";
+            const page = await pdfDoc.getPage(pageNum);
+            const scale = Math.max(window.devicePixelRatio || 1, 2);
+            const viewport = page.getViewport({ scale: scale, dontFlip: !1 });
+            const canvas = document.createElement("canvas");
+            canvas.width = viewport.width, canvas.height = viewport.height,
+            canvas.crossOrigin = "anonymous", canvas.style.zIndex = "1";
+            const context = canvas.getContext("2d");
+            await page.render({ canvasContext: context, viewport: viewport }).promise;
+            const textPage = await page.getTextContent();
+            textPage.items.length > 0 && (canvas.pdfTextContent = { text: textPage, viewport: viewport });
+            container.style.background = "none", container.appendChild(canvas),
+            container.dataset.pageState = "rendered";
+            return container;
+        }
         static async processPage(pdfDoc, pageNum) {
             const page = await pdfDoc.getPage(pageNum);
-            const viewport = page.getViewport({
-                scale: 2,
-                dontFlip: !1
-            }), canvas = document.createElement("canvas");
-            canvas.width = viewport.width, canvas.height = viewport.height, canvas.style.width = viewport.width + "px", 
-            canvas.style.height = viewport.height + "px", canvas.crossOrigin = "anonymous", 
-            canvas.style.zIndex = "1";
+            const scale = Math.max(window.devicePixelRatio || 1, 2);
+            const viewport = page.getViewport({ scale: scale, dontFlip: !1 });
+            const canvas = document.createElement("canvas");
+            canvas.width = viewport.width, canvas.height = viewport.height,
+            canvas.crossOrigin = "anonymous", canvas.style.zIndex = "1";
             const context = canvas.getContext("2d"), pageContainer = document.createElement("div");
-            pageContainer.classList.add("ocr-container"), pageContainer.style.position = "relative", 
-            pageContainer.style.display = "inline-block", await page.render({
-                canvasContext: context,
-                viewport: viewport
+            pageContainer.classList.add("ocr-container"), pageContainer.style.position = "relative",
+            pageContainer.style.width = "100%", await page.render({
+                canvasContext: context, viewport: viewport
             }).promise;
             const textPage = await page.getTextContent();
-            textPage.items.length > 0 && (canvas.pdfTextContent = {
-                text: textPage,
-                viewport: viewport
-            }), pageContainer.appendChild(canvas);
-            return document.getElementById("pdf-container").appendChild(pageContainer), ImmUtils.observeCanvasResize(canvas), 
-            pageContainer;
+            textPage.items.length > 0 && (canvas.pdfTextContent = { text: textPage, viewport: viewport });
+            pageContainer.appendChild(canvas);
+            return document.getElementById("pdf-container").appendChild(pageContainer), pageContainer;
         }
     }
     class ImageExporterFacade {
@@ -314,10 +352,7 @@
             const rect = box.getBoundingClientRect();
             clone.style.writingMode = "horizontal-tb", clone.style.transform = "none", clone.style.width = rect.height + "px", 
             clone.style.height = rect.width + "px", await new Promise(resolve => requestAnimationFrame(resolve));
-            const dataUrl = (await html2canvas(clone, {
-                scale: 2,
-                backgroundColor: null
-            })).toDataURL("image/png", 1);
+            const dataUrl = (await snapdom.toPng(clone, {scale: 2, backgroundColor: "transparent"})).src;
             return offscreen.remove(), {
                 dataUrl: dataUrl,
                 cloneWidth: rect.height,
@@ -359,16 +394,7 @@
                 bgImg.setAttribute("width", pageWidth), bgImg.setAttribute("height", pageHeight), 
                 bgImg.style.position = "absolute", bgImg.style.top = "0", bgImg.style.left = "0", 
                 bgImg.style.zIndex = "999", bgImg.style.display = "block", container.insertBefore(bgImg, container.firstChild));
-                const imgData = (await html2canvas(container, {
-                    useCORS: !0,
-                    allowTaint: !1,
-                    ...1 !== viewportScale && {
-                        width: pageWidth,
-                        height: pageHeight,
-                        windowWidth: pageWidth,
-                        windowHeight: pageHeight
-                    }
-                })).toDataURL("image/png", options.quality);
+                const imgData = (await snapdom.toPng(container, {quality: options.quality})).src;
                 1 !== viewportScale && bgImg?.remove();
                 for (const {box: box, img: img} of tempImages) box.style.display = "", img.remove();
                 if (container.style.overflow = backupOverflow, container.style.height = backupHeight, 
@@ -495,7 +521,7 @@
         }
         addCSS() {
             const style = document.createElement("style");
-            style.textContent = "\n#translationContainer,#translationFeedbackBox{display:flex!important;transition:transform var(--md-transition-duration-long) var(--md-transition-easing-standard)!important;transform-origin:right!important}#translationFeedbackBox,.notification{font-weight:var(--md-font-weight-regular)!important;letter-spacing:.25px!important;overflow-wrap:break-word!important;word-wrap:break-word!important}#translationFeedbackBox,.notification,.ocr-box{word-wrap:break-word!important}#pdf-container.dragging,.ocr-box.dragging{touch-action:none;-webkit-touch-callout:none}:root{--md-primary-50:#e8f6f9;--md-primary-100:#c6e9f0;--md-primary-200:#9fdae6;--md-primary-300:#76c8db;--md-primary-400:#58bbd4;--md-primary-500:#3aaecd;--md-primary-600:#349bc3;--md-primary-700:#2d85b5;--md-primary-800:#2770a7;--md-primary-900:#1c4e8f;--md-secondary-50:#fdf2f0;--md-secondary-100:#faddd7;--md-secondary-200:#f7c5bb;--md-secondary-300:#f3ac9f;--md-secondary-400:#f0988a;--md-secondary-500:#ed8575;--md-secondary-600:#eb7d6d;--md-secondary-700:#e87262;--md-secondary-800:#e56858;--md-secondary-900:#e05645;--md-surface-50:#f8fafb;--md-surface-100:#f1f5f7;--md-surface-200:#e8eff2;--md-surface-300:#d8e3e8;--md-surface-400:#b8c9d1;--md-surface-500:#94a8b3;--md-surface-600:#718590;--md-surface-700:#5a6b75;--md-surface-800:#42505a;--md-surface-900:#2a3439;--md-success-50:#f0faf4;--md-success-100:#dcf4e6;--md-success-500:#22c55e;--md-success-700:#15803d;--md-warning-50:#fffbeb;--md-warning-100:#fef3c7;--md-warning-500:#f59e0b;--md-warning-700:#d97706;--md-error-50:#fef2f2;--md-error-100:#fee2e2;--md-error-500:#ef4444;--md-error-700:#dc2626;--md-shadow-1:0px 2px 1px -1px rgba(0,0,0,0.2),0px 1px 1px 0px rgba(0,0,0,0.14),0px 1px 3px 0px rgba(0,0,0,0.12);--md-shadow-2:0px 3px 1px -2px rgba(0,0,0,0.2),0px 2px 2px 0px rgba(0,0,0,0.14),0px 1px 5px 0px rgba(0,0,0,0.12);--md-shadow-3:0px 3px 3px -2px rgba(0,0,0,0.2),0px 3px 4px 0px rgba(0,0,0,0.14),0px 1px 8px 0px rgba(0,0,0,0.12);--md-shadow-4:0px 2px 4px -1px rgba(0,0,0,0.2),0px 4px 5px 0px rgba(0,0,0,0.14),0px 1px 10px 0px rgba(0,0,0,0.12);--md-shadow-6:0px 3px 5px -1px rgba(0,0,0,0.2),0px 6px 10px 0px rgba(0,0,0,0.14),0px 1px 18px 0px rgba(0,0,0,0.12);--md-shadow-8:0px 5px 5px -3px rgba(0,0,0,0.2),0px 8px 10px 1px rgba(0,0,0,0.14),0px 3px 14px 2px rgba(0,0,0,0.12);--md-shadow-12:0px 7px 8px -4px rgba(0,0,0,0.2),0px 12px 17px 2px rgba(0,0,0,0.14),0px 5px 22px 4px rgba(0,0,0,0.12);--md-font-family:'Roboto',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;--md-font-weight-light:300;--md-font-weight-regular:400;--md-font-weight-medium:500;--md-font-weight-bold:700;--md-border-radius-small:4px;--md-border-radius-medium:8px;--md-border-radius-large:12px;--md-border-radius-extra-large:16px;--md-transition-duration-short:150ms;--md-transition-duration-medium:250ms;--md-transition-duration-long:300ms;--md-transition-easing-standard:cubic-bezier(0.4, 0.0, 0.2, 1);--md-transition-easing-decelerate:cubic-bezier(0.0, 0.0, 0.2, 1);--md-transition-easing-accelerate:cubic-bezier(0.4, 0.0, 1, 1)}@keyframes spin{0%{transform:rotate(0)}100%{transform:rotate(360deg)}}@keyframes md-fadein{from{opacity:0!important;transform:translateY(-8px) scale(.95)}to{opacity:1!important;transform:translateY(0) scale(1)}}@keyframes md-fadeout{from{opacity:1;transform:scale(1)}to{opacity:0;transform:scale(.95)}}@keyframes md-slide-up{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}#translationContainer{flex-direction:row!important;align-items:center!important;gap:12px!important;font-family:var(--md-font-family)!important}@media (max-width:768px){#immersiveTranslatorUI{bottom:16px!important;right:16px!important;gap:10px!important}#translationContainer{gap:8px!important;max-width:calc(100vw - 32px)!important;flex-wrap:nowrap!important}#notificationContainer{gap:10px!important;max-width:calc(100vw - 32px)!important}#translationContainer.hidden{transform:translateX(calc(100% - 96px))}}@media (max-width:480px){#immersiveTranslatorUI{bottom:12px!important;right:12px!important;gap:8px!important}#translationContainer{gap:6px!important;max-width:calc(100vw - 24px)!important}#notificationContainer{gap:8px!important;max-width:calc(100vw - 24px)!important}#translationContainer.hidden{transform:translateX(calc(100% - 96px))}}#notificationContainer,#translationFeedbackBox{max-width:90vw!important;font-family:var(--md-font-family)!important}#translationContainer.hidden{transform:translateX(calc(100% - 96px))}#translationFeedbackBox{background:var(--md-surface-800)!important;color:var(--md-surface-50)!important;padding:16px 24px!important;border-radius:var(--md-border-radius-large)!important;font-size:16px!important;align-items:center!important;box-shadow:var(--md-shadow-6)!important;backdrop-filter:blur(8px)!important;-webkit-backdrop-filter:blur(8px)!important;min-height:56px!important}.immTransl-arrow{width:24px;height:24px;cursor:pointer;transition:transform var(--md-transition-duration-medium) var(--md-transition-easing-standard);margin-right:12px;align-items:center;display:flex;color:var(--md-surface-300);border-radius:50%;padding:8px;background:rgba(255,255,255,.08);min-width:40px;min-height:40px;justify-content:center;touch-action:manipulation}.immTransl-arrow:hover{background:rgba(255,255,255,.12);color:var(--md-surface-50)}.immTransl-arrow:active{background:rgba(255,255,255,.16);transform:scale(.95)}#translationContainer.hidden .immTransl-arrow{transform:rotate(180deg)}#translationFeedbackBox .spinner{width:20px!important;height:20px!important;border:2px solid var(--md-primary-200)!important;border-top:2px solid var(--md-primary-500)!important;border-radius:50%!important;margin-right:12px!important;animation:1s linear infinite spin;flex-shrink:0!important}#immersiveTranslatorUI{position:fixed!important;bottom:20px!important;right:20px!important;z-index:10000000!important;display:flex!important;flex-direction:column!important;align-items:flex-end!important;gap:12px!important;pointer-events:none!important;font-family:var(--md-font-family)!important}#immersiveTranslatorUI>*,#notificationContainer>*{pointer-events:auto!important}#notificationContainer{display:flex!important;flex-direction:column!important;gap:5px!important}.notification{padding:16px 24px!important;border-radius:var(--md-border-radius-medium)!important;color:var(--md-surface-50)!important;font-family:var(--md-font-family)!important;font-size:14px!important;box-shadow:var(--md-shadow-4)!important;animation:md-fadein var(--md-transition-duration-long) var(--md-transition-easing-decelerate)!important;backdrop-filter:blur(8px)!important;-webkit-backdrop-filter:blur(8px)!important;line-height:1.4!important;max-width:100%!important}.immTransl-control-btn,.notification.warning{font-weight:var(--md-font-weight-medium)!important}.immTransl-control-btn.cancel,.notification.error{background-color:var(--md-error-500)!important;color:var(--md-surface-50)!important}.notification.warning{background-color:var(--md-warning-500)!important;color:var(--md-surface-900)!important}.immTransl-control-btn.resume,.notification.success{background-color:var(--md-success-500)!important;color:var(--md-surface-50)!important}.notification.info{background-color:var(--md-primary-500)!important;color:var(--md-surface-50)!important}.fade-out{animation:md-fadeout var(--md-transition-duration-medium) var(--md-transition-easing-accelerate) forwards!important}#translationControls{margin-left:16px!important;display:flex!important;gap:8px!important;align-items:center!important;flex-shrink:0!important}.immTransl-control-btn{width:40px!important;height:40px!important;border:none!important;border-radius:50%!important;cursor:pointer!important;outline:0!important;display:flex!important;align-items:center!important;justify-content:center!important;color:var(--md-surface-50)!important;font-size:16px!important;font-family:var(--md-font-family)!important;transition:all var(--md-transition-duration-short) var(--md-transition-easing-standard)!important;box-shadow:var(--md-shadow-2)!important;position:relative!important;overflow:hidden!important;touch-action:manipulation!important;min-width:44px!important;min-height:44px!important;flex-shrink:0!important}.ocr-box .spinner,.text-spinner{display:inline-block;animation:1s linear infinite spin}#pdf-viewer,.text-retry-button,.translation-wrapper{font-family:var(--md-font-family)}#pdf-toolbar,#pdf-toolbar button,#pdf-toolbar span,.text-retry-button{font-weight:var(--md-font-weight-medium);color:var(--md-surface-50)}#pdf-toolbar button::before,#pdfOptionsModal button::before,.immTransl-control-btn::before,.text-retry-button::before{content:'';position:absolute;top:0;left:0;right:0;bottom:0;background:currentColor;opacity:0;transition:opacity var(--md-transition-duration-short) var(--md-transition-easing-standard);border-radius:inherit}#pdf-toolbar button:focus::before,#pdfOptionsModal button:hover::before,.immTransl-control-btn:hover::before,.text-retry-button:hover::before{opacity:.08}#pdf-toolbar button:active::before,#pdfOptionsModal button:focus::before,.immTransl-control-btn:focus::before{opacity:.12}.immTransl-control-btn:active{transform:scale(.96)!important;box-shadow:var(--md-shadow-1)!important}#pdfOptionsModal button:active::before,.immTransl-control-btn:active::before,.text-retry-button:active::before{opacity:.16}.immTransl-control-btn.pause{background-color:var(--md-warning-500)!important;color:var(--md-surface-900)!important}.immTransl-control-btn.reset{background-color:var(--md-primary-500)!important;color:var(--md-surface-50)!important;width:48px!important;height:48px!important;box-shadow:var(--md-shadow-4)!important;min-width:48px!important;min-height:48px!important}.immTransl-control-btn:disabled{opacity:.38!important;cursor:not-allowed!important;box-shadow:none!important}#pdfOptionsModal button#confirmPdfOptions:hover,.text-retry-button:hover{box-shadow:var(--md-shadow-4);transform:translateY(-1px)}#pdf-toolbar button:disabled::before,.immTransl-control-btn:disabled::before{display:none}.translation-wrapper{position:relative;align-items:center}.text-spinner{width:16px;height:16px;border:2px solid var(--md-surface-400);border-top:2px solid var(--md-primary-500);border-radius:50%;margin-left:8px;flex:0 0 auto}#pdfOptionsModal input[type=radio],.text-retry-button{width:20px;height:20px;cursor:pointer;position:relative;transition:all var(--md-transition-duration-short) var(--md-transition-easing-standard)}.text-retry-button{background-color:var(--md-error-500);border:none;border-radius:var(--md-border-radius-small);padding:4px;display:inline-flex;align-items:center;justify-content:center;text-transform:uppercase;outline:0;box-shadow:var(--md-shadow-2);z-index:1000;overflow:hidden;touch-action:manipulation;min-width:28px;min-height:28px}.ocr-box,.ocr-overlay{font-family:'Helvetica Neue',Arial,sans-serif!important;z-index:9999!important;display:flex;position:absolute!important}@media (max-width:768px){#translationFeedbackBox{padding:14px 20px!important;font-size:15px!important;border-radius:var(--md-border-radius-medium)!important;min-height:52px!important;max-width:calc(100vw - 120px)!important}.immTransl-arrow{width:20px;height:20px;min-width:44px;min-height:44px;padding:12px;margin-right:8px}#translationFeedbackBox .spinner{width:18px!important;height:18px!important;margin-right:10px!important}.notification{padding:14px 20px!important;font-size:13px!important;border-radius:var(--md-border-radius-small)!important;line-height:1.3!important}#translationControls{margin-left:12px!important;gap:6px!important}.immTransl-control-btn{width:38px!important;height:38px!important;font-size:15px!important;min-width:44px!important;min-height:44px!important}.immTransl-control-btn.reset{width:46px!important;height:46px!important;min-width:48px!important;min-height:48px!important}.text-spinner{width:15px;height:15px;margin-left:6px;border-width:1.5px}.text-retry-button{width:24px;height:24px;min-width:32px;min-height:32px;padding:4px}}@media (max-width:480px){#translationFeedbackBox{padding:12px 16px!important;font-size:14px!important;min-height:48px!important;max-width:calc(100vw - 100px)!important;line-height:1.3!important}.immTransl-arrow{width:18px;height:18px;min-width:40px;min-height:40px;padding:11px;margin-right:6px}#translationFeedbackBox .spinner{width:16px!important;height:16px!important;margin-right:8px!important}.notification{padding:12px 16px!important;font-size:12px!important;line-height:1.25!important}#translationControls{margin-left:8px!important;gap:4px!important}.immTransl-control-btn{width:36px!important;height:36px!important;font-size:14px!important;min-width:44px!important;min-height:44px!important}.immTransl-control-btn.reset{width:44px!important;height:44px!important;min-width:48px!important;min-height:48px!important}.text-spinner{width:14px;height:14px;margin-left:5px;border-width:1.5px}.text-retry-button{width:22px;height:22px;min-width:30px;min-height:30px;padding:4px}}#pdfOptionsModal button#confirmPdfOptions:active,.text-retry-button:active{transform:translateY(0);box-shadow:var(--md-shadow-1)}.text-retry-button::after{position:absolute;top:0;left:0;right:0;bottom:0;background:0 0;z-index:9999}@media (max-width:768px) and (orientation:landscape){#immersiveTranslatorUI{bottom:8px!important}}.ocr-overlay{color:#fff!important;text-shadow:0 1px 2px rgba(0,0,0,.6)!important;padding:4px 8px!important;border-radius:0!important;align-items:center!important;justify-content:center!important;transition:opacity .3s!important;opacity:.95!important;overflow:hidden!important;white-space:pre-wrap!important}.ocr-box{left:var(--pos-x,0);top:var(--pos-y,0);width:var(--box-width,auto);height:var(--box-height,auto);transition:left 50ms,top 50ms;background:linear-gradient(135deg,rgba(44,62,80,.95),rgba(52,73,94,.85));box-shadow:8px 8px 11px rgba(0,0,0,.1),0 1px 2px rgba(0,0,0,.1)!important;color:#fff;font-weight:400!important;justify-content:center!important;align-items:center!important;flex-direction:column!important;-webkit-overflow-scrolling:touch;backdrop-filter:blur(40px)!important;-webkit-backdrop-filter:blur(40px)!important;hyphens:auto!important;-webkit-hyphens:auto!important;line-height:1.2em!important;box-sizing:border-box!important;word-break:break-word!important;letter-spacing:normal!important;border-radius:8px!important;text-align:left!important;padding:2px 4px!important;overflow:auto!important;white-space:normal!important}.ocr-box-text{font-size:100%}.ocr-box-text::-webkit-scrollbar{-webkit-appearance:none;width:0;height:0}.ocr-box::-webkit-scrollbar{-webkit-appearance:none;width:0;height:0}.ocr-box.dragging{user-select:none;-webkit-user-select:none}#pdf-container.dragging{-webkit-user-select:none;user-select:none}.ocr-box.ocr-box-error{background:linear-gradient(135deg,#f8e1e1,#fdf5f5);color:#a94442;box-shadow:0 4px 8px rgba(0,0,0,.05);border-radius:8px;padding:0;overflow:hidden}.ocr-box.ocr-box-error:hover{transform:scale(1.02);box-shadow:0 8px 16px rgba(0,0,0,.2)}.ocr-box .spinner{width:auto;height:1em;aspect-ratio:1;border:3px solid rgba(255,255,255,.1)!important;border-top:3px solid transparent!important;border-radius:50%!important;margin:auto!important}.ocr-box.ocr-box-error .ocr-retry-btn{display:flex;align-items:center;justify-content:center;width:100%;height:100%;background:#f44336;color:#fff;font-size:clamp(6px, 5vw, 24px);font-weight:500;border:none;outline:0;border-radius:4px;cursor:pointer;text-transform:uppercase;letter-spacing:.5px;position:relative;overflow:hidden;transition:background .3s,box-shadow .3s}.ocr-box.ocr-box-error .ocr-retry-btn:hover{background:#e53935;box-shadow:0 4px 8px rgba(0,0,0,.3)}.ocr-box.ocr-box-error .ocr-retry-btn:active{background:#d32f2f;box-shadow:0 2px 4px rgba(0,0,0,.2)}.ocr-box.ocr-box-error .ocr-retry-btn::after{content:\"\";position:absolute;top:50%;left:50%;width:5px;height:5px;background:rgba(255,255,255,.5);opacity:0;border-radius:50%;transform:translate(-50%,-50%) scale(1);transition:width .6s ease-out,height .6s ease-out,opacity .6s ease-out}.ocr-box.ocr-box-error .ocr-retry-btn:active::after{width:120%;height:120%;opacity:0;transition:none}.img-container{position:relative!important;display:inline-block!important}#pdf-viewer{position:relative;width:auto;height:95%;display:flex}#pdf-toolbar{position:fixed;top:16px;left:50%;transform:translateX(-50%);width:90%;max-width:640px;height:64px;background:var(--md-surface-800);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border-radius:var(--md-border-radius-extra-large);display:flex;align-items:center;justify-content:space-between;z-index:1000000;box-shadow:var(--md-shadow-8);padding:0 20px;font-family:var(--md-font-family)}#pdf-toolbar button,#pdfOptionsOverlay{align-items:center;display:flex;font-family:var(--md-font-family)}#pdf-toolbar button{background:rgba(255,255,255,.08);border:none;padding:12px;margin:0 4px;border-radius:var(--md-border-radius-large);font-size:18px;cursor:pointer;transition:all var(--md-transition-duration-short) var(--md-transition-easing-standard);justify-content:center;width:48px;height:48px;position:relative;overflow:hidden}#pdf-toolbar button:hover{background:rgba(255,255,255,.12);box-shadow:var(--md-shadow-2)}#pdf-toolbar button:hover::before{opacity:.04}#pdf-toolbar button:active{transform:scale(.96);box-shadow:var(--md-shadow-1)}#pdf-toolbar button:disabled{opacity:.38;cursor:not-allowed;box-shadow:none}#pdf-toolbar button i{font-size:20px}#pdf-toolbar span{font-size:16px;text-align:center;flex-grow:1;padding:0 16px;letter-spacing:.5px}.PDFtextLayer span{position:absolute!important}.PDFtextLayer{position:absolute;top:0;left:0;width:100%;height:100%}#pdf-container{flex:1;display:flex;flex-direction:column;gap:20px;overflow:visible;position:relative;margin:auto;width:95%;font-family:var(--md-font-family)}#pdf-container .ocr-container{position:relative;width:100%;box-shadow:var(--md-shadow-2);border-radius:var(--md-border-radius-medium);overflow:hidden;background:var(--md-surface-50)}#pdf-container canvas{width:100%!important;height:auto!important;display:block;border-radius:var(--md-border-radius-medium)}#pdfOptionsOverlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.32);justify-content:center;z-index:10000;padding:24px;animation:md-fadein var(--md-transition-duration-long) var(--md-transition-easing-decelerate);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px)}#pdfOptionsModal{background:var(--md-surface-50);border-radius:var(--md-border-radius-extra-large);padding:24px;width:100%;max-width:400px;box-shadow:var(--md-shadow-12);font-family:var(--md-font-family);color:var(--md-surface-900);opacity:0;transform:translateY(16px) scale(.95);animation:md-slide-up var(--md-transition-duration-long) var(--md-transition-easing-decelerate) forwards}#pdfOptionsModal h2{margin-top:0;font-size:24px;font-weight:var(--md-font-weight-regular);color:var(--md-surface-900);text-align:center;margin-bottom:24px;letter-spacing:.15px}#pdfOptionsModal form>div{margin-bottom:20px}#pdfOptionsModal label{color:var(--md-surface-700);font-size:14px;font-weight:var(--md-font-weight-medium);margin-left:12px;letter-spacing:.25px}#pdfOptionsModal input[type=number],#pdfOptionsModal input[type=text]{width:calc(100% - 24px);padding:16px 12px;margin-top:8px;border:1px solid var(--md-surface-400);border-radius:var(--md-border-radius-small);font-size:16px;font-family:var(--md-font-family);color:var(--md-surface-900);background:var(--md-surface-50);transition:border-color var(--md-transition-duration-short) var(--md-transition-easing-standard),box-shadow var(--md-transition-duration-short) var(--md-transition-easing-standard)}#pdfOptionsModal .quality-container label,#pdfOptionsModal .quality-container span,#pdfOptionsModal button{font-size:14px;font-weight:var(--md-font-weight-medium)}#pdfOptionsModal input[type=number]:focus,#pdfOptionsModal input[type=text]:focus{outline:0;border-color:var(--md-primary-500);box-shadow:0 0 0 2px rgba(33,150,243,.2)}#pdfOptionsModal input[type=radio]{appearance:none;-webkit-appearance:none;border:2px solid var(--md-surface-400);border-radius:50%;margin-right:12px}#pdfOptionsModal input[type=radio]:checked{border-color:var(--md-primary-500)}#pdfOptionsModal input[type=radio]:checked::before{content:'';position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:10px;height:10px;background:var(--md-primary-500);border-radius:50%}#pdfOptionsModal .quality-container{display:flex;align-items:center;justify-content:center;gap:12px;margin:16px 0}#pdfOptionsModal .quality-container label{color:var(--md-surface-700)}#pdfOptionsModal .quality-container input[type=range]{flex:1;margin:0}#pdfOptionsModal .quality-container span{width:48px;text-align:center;color:var(--md-primary-500);background:var(--md-primary-50);padding:4px 8px;border-radius:var(--md-border-radius-small)}#pdfOptionsModal input[type=range]{appearance:none;-webkit-appearance:none;width:100%;height:4px;border-radius:2px;background:var(--md-surface-300);outline:0;transition:background var(--md-transition-duration-short) var(--md-transition-easing-standard)}#pdfOptionsModal input[type=range]::-webkit-slider-runnable-track{width:100%;height:4px;cursor:pointer;background:var(--md-surface-300);border-radius:2px}#pdfOptionsModal input[type=range]::-webkit-slider-thumb{appearance:none;-webkit-appearance:none;width:20px;height:20px;border-radius:50%;background:var(--md-primary-500);cursor:pointer;transition:all var(--md-transition-duration-short) var(--md-transition-easing-standard);box-shadow:var(--md-shadow-1);margin-top:-8px}#pdfOptionsModal input[type=range]::-webkit-slider-thumb:hover{background:var(--md-primary-600);transform:scale(1.1);box-shadow:var(--md-shadow-2)}#pdfOptionsModal .button-group{display:flex;justify-content:flex-end;gap:12px;margin-top:32px}#pdfOptionsModal button{padding:12px 24px;font-family:var(--md-font-family);border:none;border-radius:var(--md-border-radius-large);cursor:pointer;text-transform:uppercase;letter-spacing:.75px;min-width:64px;position:relative;overflow:hidden;transition:all var(--md-transition-duration-short) var(--md-transition-easing-standard)}#pdfOptionsModal button#cancelPdfOptions{background:0 0;color:var(--md-surface-600);border:1px solid var(--md-surface-300)}#pdfOptionsModal button#cancelPdfOptions:hover{background:var(--md-surface-100);border-color:var(--md-surface-400)}#pdfOptionsModal button#confirmPdfOptions{background:var(--md-primary-500);color:var(--md-surface-50);box-shadow:var(--md-shadow-2)}#pdfOptionsModal button#confirmPdfOptions:hover{background:var(--md-primary-600)}@media (max-width:768px){.immTransl-arrow,.immTransl-control-btn,.text-retry-button,button{min-width:44px!important;min-height:44px!important}#translationFeedbackBox,.notification{-webkit-text-size-adjust:100%;text-size-adjust:100%}#translationContainer{padding:0!important}input[type=email],input[type=number],input[type=password],input[type=text],textarea{font-size:16px!important}#pdfOptionsModal{padding:20px;max-width:calc(100vw - 40px);border-radius:var(--md-border-radius-large)}#pdfOptionsModal h2{font-size:22px;margin-bottom:20px}#pdfOptionsModal button{padding:14px 20px;font-size:14px;min-width:80px;min-height:44px}#pdfOptionsModal input[type=number],#pdfOptionsModal input[type=text]{padding:14px 12px;font-size:16px}#pdfOptionsOverlay{padding:20px}#pdf-toolbar{width:95%;height:60px;padding:0 16px;top:12px}#pdf-toolbar button{width:42px;height:42px;margin:0 2px;font-size:16px;min-width:44px;min-height:44px}#pdf-toolbar button i{font-size:18px}#pdf-toolbar span{font-size:15px;padding:0 12px}#pdf-container{margin-top:88px;gap:16px;width:98%}#pdf-toolbar #pageIndicator,#pdf-toolbar #zoomIndicator{font-size:13px}}@media (max-width:480px){#translationFeedbackBox{min-width:200px!important}.notification{min-width:180px!important}.immTransl-arrow,.immTransl-control-btn,.text-retry-button,button{min-width:40px!important;min-height:40px!important}#pdfOptionsModal .quality-container{flex-direction:column;align-items:center}#pdfOptionsModal{padding:16px;max-width:calc(100vw - 24px);border-radius:var(--md-border-radius-medium)}#pdfOptionsModal h2{font-size:20px;margin-bottom:16px}#pdfOptionsModal button{padding:12px 16px;font-size:14px;min-width:72px;min-height:44px}#pdfOptionsModal button#confirmPdfOptions{flex:1}#pdfOptionsModal .quality-container{flex-direction:column;align-items:stretch;gap:12px}#pdfOptionsModal .quality-container input[type=range]{width:100%;margin:8px 0}#pdfOptionsModal .quality-container span{text-align:center;align-self:center}#pdfOptionsModal input[type=number],#pdfOptionsModal input[type=text]{padding:12px 10px;font-size:16px;width:calc(100% - 20px)}#pdfOptionsOverlay{padding:12px}#pdf-toolbar{height:56px;padding:0 12px;top:8px}#pdf-toolbar button{width:38px;height:38px;margin:0 1px;font-size:14px}#pdf-toolbar button i{font-size:16px}#pdf-toolbar span{font-size:14px;padding:0 8px}#pdf-container{margin-top:80px;gap:12px;width:99%}#pdf-toolbar #pageIndicator,#pdf-toolbar #zoomIndicator{font-size:12px}.ocr-box{padding:1px 2px!important;border-radius:4px!important}.ocr-overlay{padding:2px 4px!important}}\n            ", 
+            style.textContent = '\n#translationContainer,#translationFeedbackBox{display:flex!important;transition:transform var(--md-transition-duration-long) var(--md-transition-easing-standard)!important;transform-origin:right!important}#translationFeedbackBox,.notification{font-weight:var(--md-font-weight-regular)!important;letter-spacing:.25px!important;overflow-wrap:break-word!important;word-wrap:break-word!important}#translationFeedbackBox,.notification,.ocr-box{word-wrap:break-word!important}#pdf-container.dragging,.ocr-box.dragging{touch-action:none;-webkit-touch-callout:none}:root{--md-primary-50:#e8f6f9;--md-primary-100:#c6e9f0;--md-primary-200:#9fdae6;--md-primary-300:#76c8db;--md-primary-400:#58bbd4;--md-primary-500:#3aaecd;--md-primary-600:#349bc3;--md-primary-700:#2d85b5;--md-primary-800:#2770a7;--md-primary-900:#1c4e8f;--md-secondary-50:#fdf2f0;--md-secondary-100:#faddd7;--md-secondary-200:#f7c5bb;--md-secondary-300:#f3ac9f;--md-secondary-400:#f0988a;--md-secondary-500:#ed8575;--md-secondary-600:#eb7d6d;--md-secondary-700:#e87262;--md-secondary-800:#e56858;--md-secondary-900:#e05645;--md-surface-50:#f8fafb;--md-surface-100:#f1f5f7;--md-surface-200:#e8eff2;--md-surface-300:#d8e3e8;--md-surface-400:#b8c9d1;--md-surface-500:#94a8b3;--md-surface-600:#718590;--md-surface-700:#5a6b75;--md-surface-800:#42505a;--md-surface-900:#2a3439;--md-success-50:#f0faf4;--md-success-100:#dcf4e6;--md-success-500:#22c55e;--md-success-700:#15803d;--md-warning-50:#fffbeb;--md-warning-100:#fef3c7;--md-warning-500:#f59e0b;--md-warning-700:#d97706;--md-error-50:#fef2f2;--md-error-100:#fee2e2;--md-error-500:#ef4444;--md-error-700:#dc2626;--md-shadow-1:0px 2px 1px -1px rgba(0,0,0,0.2),0px 1px 1px 0px rgba(0,0,0,0.14),0px 1px 3px 0px rgba(0,0,0,0.12);--md-shadow-2:0px 3px 1px -2px rgba(0,0,0,0.2),0px 2px 2px 0px rgba(0,0,0,0.14),0px 1px 5px 0px rgba(0,0,0,0.12);--md-shadow-3:0px 3px 3px -2px rgba(0,0,0,0.2),0px 3px 4px 0px rgba(0,0,0,0.14),0px 1px 8px 0px rgba(0,0,0,0.12);--md-shadow-4:0px 2px 4px -1px rgba(0,0,0,0.2),0px 4px 5px 0px rgba(0,0,0,0.14),0px 1px 10px 0px rgba(0,0,0,0.12);--md-shadow-6:0px 3px 5px -1px rgba(0,0,0,0.2),0px 6px 10px 0px rgba(0,0,0,0.14),0px 1px 18px 0px rgba(0,0,0,0.12);--md-shadow-8:0px 5px 5px -3px rgba(0,0,0,0.2),0px 8px 10px 1px rgba(0,0,0,0.14),0px 3px 14px 2px rgba(0,0,0,0.12);--md-shadow-12:0px 7px 8px -4px rgba(0,0,0,0.2),0px 12px 17px 2px rgba(0,0,0,0.14),0px 5px 22px 4px rgba(0,0,0,0.12);--md-font-family:"Roboto",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;--md-font-weight-light:300;--md-font-weight-regular:400;--md-font-weight-medium:500;--md-font-weight-bold:700;--md-border-radius-small:4px;--md-border-radius-medium:8px;--md-border-radius-large:12px;--md-border-radius-extra-large:16px;--md-transition-duration-short:150ms;--md-transition-duration-medium:250ms;--md-transition-duration-long:300ms;--md-transition-easing-standard:cubic-bezier(0.4, 0.0, 0.2, 1);--md-transition-easing-decelerate:cubic-bezier(0.0, 0.0, 0.2, 1);--md-transition-easing-accelerate:cubic-bezier(0.4, 0.0, 1, 1)}@keyframes spin{0%{transform:rotate(0)}100%{transform:rotate(360deg)}}@keyframes md-fadein{from{opacity:0!important;transform:translateY(-8px) scale(.95)}to{opacity:1!important;transform:translateY(0) scale(1)}}@keyframes md-fadeout{from{opacity:1;transform:scale(1)}to{opacity:0;transform:scale(.95)}}@keyframes md-slide-up{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}#translationContainer{flex-direction:row!important;align-items:center!important;gap:12px!important;font-family:var(--md-font-family)!important}@media (max-width:768px){#immersiveTranslatorUI{bottom:16px!important;right:16px!important;gap:10px!important}#translationContainer{gap:8px!important;max-width:calc(100vw - 32px)!important;flex-wrap:nowrap!important}#notificationContainer{gap:10px!important;max-width:calc(100vw - 32px)!important}#translationContainer.hidden{transform:translateX(calc(100% - 96px))}}@media (max-width:480px){#immersiveTranslatorUI{bottom:12px!important;right:12px!important;gap:8px!important}#translationContainer{gap:6px!important;max-width:calc(100vw - 24px)!important}#notificationContainer{gap:8px!important;max-width:calc(100vw - 24px)!important}#translationContainer.hidden{transform:translateX(calc(100% - 96px))}}#notificationContainer,#translationFeedbackBox{max-width:90vw!important;font-family:var(--md-font-family)!important}#translationContainer.hidden{transform:translateX(calc(100% - 96px))}#translationFeedbackBox{background:var(--md-surface-800)!important;color:var(--md-surface-50)!important;padding:16px 24px!important;border-radius:var(--md-border-radius-large)!important;font-size:16px!important;align-items:center!important;box-shadow:var(--md-shadow-6)!important;backdrop-filter:blur(8px)!important;-webkit-backdrop-filter:blur(8px)!important;min-height:56px!important}.immTransl-arrow{width:24px;height:24px;cursor:pointer;transition:transform var(--md-transition-duration-medium) var(--md-transition-easing-standard);margin-right:12px;align-items:center;display:flex;color:var(--md-surface-300);border-radius:50%;padding:8px;background:rgba(255,255,255,.08);min-width:40px;min-height:40px;justify-content:center;touch-action:manipulation}.immTransl-arrow:hover{background:rgba(255,255,255,.12);color:var(--md-surface-50)}.immTransl-arrow:active{background:rgba(255,255,255,.16);transform:scale(.95)}#translationContainer.hidden .immTransl-arrow{transform:rotate(180deg)}#translationFeedbackBox .spinner{width:20px!important;height:20px!important;border:2px solid var(--md-primary-200)!important;border-top:2px solid var(--md-primary-500)!important;border-radius:50%!important;margin-right:12px!important;animation:1s linear infinite spin;flex-shrink:0!important}#immersiveTranslatorUI{position:fixed!important;bottom:20px!important;right:20px!important;z-index:10000000!important;display:flex!important;flex-direction:column!important;align-items:flex-end!important;gap:12px!important;pointer-events:none!important;font-family:var(--md-font-family)!important}#immersiveTranslatorUI>*,#notificationContainer>*{pointer-events:auto!important}#notificationContainer{display:flex!important;flex-direction:column!important;gap:5px!important}.notification{padding:16px 24px!important;border-radius:var(--md-border-radius-medium)!important;color:var(--md-surface-50)!important;font-family:var(--md-font-family)!important;font-size:14px!important;box-shadow:var(--md-shadow-4)!important;animation:md-fadein var(--md-transition-duration-long) var(--md-transition-easing-decelerate)!important;backdrop-filter:blur(8px)!important;-webkit-backdrop-filter:blur(8px)!important;line-height:1.4!important;max-width:100%!important}.immTransl-control-btn,.notification.warning{font-weight:var(--md-font-weight-medium)!important}.immTransl-control-btn.cancel,.notification.error{background-color:var(--md-error-500)!important;color:var(--md-surface-50)!important}.notification.warning{background-color:var(--md-warning-500)!important;color:var(--md-surface-900)!important}.immTransl-control-btn.resume,.notification.success{background-color:var(--md-success-500)!important;color:var(--md-surface-50)!important}.notification.info{background-color:var(--md-primary-500)!important;color:var(--md-surface-50)!important}.fade-out{animation:md-fadeout var(--md-transition-duration-medium) var(--md-transition-easing-accelerate) forwards!important}#translationControls{margin-left:16px!important;display:flex!important;gap:8px!important;align-items:center!important;flex-shrink:0!important}.immTransl-control-btn{width:40px!important;height:40px!important;border:none!important;border-radius:50%!important;cursor:pointer!important;outline:0!important;display:flex!important;align-items:center!important;justify-content:center!important;color:var(--md-surface-50)!important;font-size:16px!important;font-family:var(--md-font-family)!important;transition:all var(--md-transition-duration-short) var(--md-transition-easing-standard)!important;box-shadow:var(--md-shadow-2)!important;position:relative!important;overflow:hidden!important;touch-action:manipulation!important;min-width:44px!important;min-height:44px!important;flex-shrink:0!important}.ocr-box .spinner,.text-spinner{display:inline-block;animation:1s linear infinite spin}#pdf-viewer,.text-retry-button,.translation-wrapper{font-family:var(--md-font-family)}#pdf-toolbar,#pdf-toolbar button,#pdf-toolbar span,.text-retry-button{font-weight:var(--md-font-weight-medium);color:var(--md-surface-50)}#pdf-toolbar button::before,#pdfOptionsModal button::before,.immTransl-control-btn::before,.text-retry-button::before{content:"";position:absolute;top:0;left:0;right:0;bottom:0;background:currentColor;opacity:0;transition:opacity var(--md-transition-duration-short) var(--md-transition-easing-standard);border-radius:inherit}#pdf-toolbar button:focus::before,#pdfOptionsModal button:hover::before,.immTransl-control-btn:hover::before,.text-retry-button:hover::before{opacity:.08}#pdf-toolbar button:active::before,#pdfOptionsModal button:focus::before,.immTransl-control-btn:focus::before{opacity:.12}.immTransl-control-btn:active{transform:scale(.96)!important;box-shadow:var(--md-shadow-1)!important}#pdfOptionsModal button:active::before,.immTransl-control-btn:active::before,.text-retry-button:active::before{opacity:.16}.immTransl-control-btn.pause{background-color:var(--md-warning-500)!important;color:var(--md-surface-900)!important}.immTransl-control-btn.reset{background-color:var(--md-primary-500)!important;color:var(--md-surface-50)!important;width:48px!important;height:48px!important;box-shadow:var(--md-shadow-4)!important;min-width:48px!important;min-height:48px!important}.immTransl-control-btn:disabled{opacity:.38!important;cursor:not-allowed!important;box-shadow:none!important}#pdfOptionsModal button#confirmPdfOptions:hover,.text-retry-button:hover{box-shadow:var(--md-shadow-4);transform:translateY(-1px)}#pdf-toolbar button:disabled::before,.immTransl-control-btn:disabled::before{display:none}.translation-wrapper{position:relative;align-items:center}.text-spinner{width:16px;height:16px;border:2px solid var(--md-surface-400);border-top:2px solid var(--md-primary-500);border-radius:50%;margin-left:8px;flex:0 0 auto}#pdfOptionsModal input[type=radio],.text-retry-button{width:20px;height:20px;cursor:pointer;position:relative;transition:all var(--md-transition-duration-short) var(--md-transition-easing-standard)}.text-retry-button{background-color:var(--md-error-500);border:none;border-radius:var(--md-border-radius-small);padding:4px;display:inline-flex;align-items:center;justify-content:center;text-transform:uppercase;outline:0;box-shadow:var(--md-shadow-2);z-index:1000;overflow:hidden;touch-action:manipulation;min-width:28px;min-height:28px}.ocr-box,.ocr-overlay{font-family:"Helvetica Neue",Arial,sans-serif!important;z-index:9999!important;display:flex;position:absolute!important}@media (max-width:768px){#translationFeedbackBox{padding:14px 20px!important;font-size:15px!important;border-radius:var(--md-border-radius-medium)!important;min-height:52px!important;max-width:calc(100vw - 120px)!important}.immTransl-arrow{width:20px;height:20px;min-width:44px;min-height:44px;padding:12px;margin-right:8px}#translationFeedbackBox .spinner{width:18px!important;height:18px!important;margin-right:10px!important}.notification{padding:14px 20px!important;font-size:13px!important;border-radius:var(--md-border-radius-small)!important;line-height:1.3!important}#translationControls{margin-left:12px!important;gap:6px!important}.immTransl-control-btn{width:38px!important;height:38px!important;font-size:15px!important;min-width:44px!important;min-height:44px!important}.immTransl-control-btn.reset{width:46px!important;height:46px!important;min-width:48px!important;min-height:48px!important}.text-spinner{width:15px;height:15px;margin-left:6px;border-width:1.5px}.text-retry-button{width:24px;height:24px;min-width:32px;min-height:32px;padding:4px}}@media (max-width:480px){#translationFeedbackBox{padding:12px 16px!important;font-size:14px!important;min-height:48px!important;max-width:calc(100vw - 100px)!important;line-height:1.3!important}.immTransl-arrow{width:18px;height:18px;min-width:40px;min-height:40px;padding:11px;margin-right:6px}#translationFeedbackBox .spinner{width:16px!important;height:16px!important;margin-right:8px!important}.notification{padding:12px 16px!important;font-size:12px!important;line-height:1.25!important}#translationControls{margin-left:8px!important;gap:4px!important}.immTransl-control-btn{width:36px!important;height:36px!important;font-size:14px!important;min-width:44px!important;min-height:44px!important}.immTransl-control-btn.reset{width:44px!important;height:44px!important;min-width:48px!important;min-height:48px!important}.text-spinner{width:14px;height:14px;margin-left:5px;border-width:1.5px}.text-retry-button{width:22px;height:22px;min-width:30px;min-height:30px;padding:4px}}#pdfOptionsModal button#confirmPdfOptions:active,.text-retry-button:active{transform:translateY(0);box-shadow:var(--md-shadow-1)}.text-retry-button::after{position:absolute;top:0;left:0;right:0;bottom:0;background:0 0;z-index:9999}@media (max-width:768px) and (orientation:landscape){#immersiveTranslatorUI{bottom:8px!important}}.ocr-overlay{color:#fff!important;text-shadow:0 1px 2px rgba(0,0,0,.6)!important;padding:4px 8px!important;border-radius:0!important;align-items:center!important;justify-content:center!important;transition:opacity .3s!important;opacity:.95!important;overflow:hidden!important;white-space:pre-wrap!important}.ocr-box{left:var(--pos-x,0);top:var(--pos-y,0);width:var(--box-width,auto);height:var(--box-height,auto);background:linear-gradient(135deg,rgba(44,62,80,.95),rgba(52,73,94,.85));color:#fff;font-weight:400!important;justify-content:center!important;align-items:center!important;flex-direction:column!important;-webkit-overflow-scrolling:touch;hyphens:auto!important;-webkit-hyphens:auto!important;line-height:1.2em!important;box-sizing:border-box!important;word-break:break-word!important;letter-spacing:normal!important;border-radius:8px!important;text-align:left!important;padding:2px 4px!important;overflow:auto!important;white-space:normal!important;contain:layout style paint}.ocr-box-text{font-size:100%}.ocr-box-text::-webkit-scrollbar{-webkit-appearance:none;width:0;height:0}.ocr-box::-webkit-scrollbar{-webkit-appearance:none;width:0;height:0}.ocr-box.dragging{user-select:none;-webkit-user-select:none}#pdf-container.dragging{-webkit-user-select:none;user-select:none}.ocr-box.ocr-box-error{background:linear-gradient(135deg,#f8e1e1,#fdf5f5);color:#a94442;box-shadow:0 4px 8px rgba(0,0,0,.05);border-radius:8px;padding:0;overflow:hidden}.ocr-box.ocr-box-error:hover{transform:scale(1.02);box-shadow:0 8px 16px rgba(0,0,0,.2)}.ocr-box .spinner{width:auto;height:1em;aspect-ratio:1;border:3px solid rgba(255,255,255,.1)!important;border-top:3px solid transparent!important;border-radius:50%!important;margin:auto!important}.ocr-box.ocr-box-error .ocr-retry-btn{display:flex;align-items:center;justify-content:center;width:100%;height:100%;background:#f44336;color:#fff;font-size:clamp(6px, 5vw, 24px);font-weight:500;border:none;outline:0;border-radius:4px;cursor:pointer;text-transform:uppercase;letter-spacing:.5px;position:relative;overflow:hidden;transition:background .3s,box-shadow .3s}.ocr-box.ocr-box-error .ocr-retry-btn:hover{background:#e53935;box-shadow:0 4px 8px rgba(0,0,0,.3)}.ocr-box.ocr-box-error .ocr-retry-btn:active{background:#d32f2f;box-shadow:0 2px 4px rgba(0,0,0,.2)}.ocr-box.ocr-box-error .ocr-retry-btn::after{content:"";position:absolute;top:50%;left:50%;width:5px;height:5px;background:rgba(255,255,255,.5);opacity:0;border-radius:50%;transform:translate(-50%,-50%) scale(1);transition:width .6s ease-out,height .6s ease-out,opacity .6s ease-out}.ocr-box.ocr-box-error .ocr-retry-btn:active::after{width:120%;height:120%;opacity:0;transition:none}.img-container{position:relative!important;display:inline-block!important}#pdf-viewer{position:relative;width:100%;min-height:95%;display:flex;justify-content:center;overflow-x:auto}#pdf-toolbar{position:fixed;top:16px;left:50%;transform:translateX(-50%);width:90%;max-width:640px;height:64px;background:var(--md-surface-800);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border-radius:var(--md-border-radius-extra-large);display:flex;align-items:center;justify-content:space-between;z-index:1000000;box-shadow:var(--md-shadow-8);padding:0 20px;font-family:var(--md-font-family)}#pdf-toolbar button,#pdfOptionsOverlay{align-items:center;display:flex;font-family:var(--md-font-family)}#pdf-toolbar button{background:rgba(255,255,255,.08);border:none;padding:12px;margin:0 4px;border-radius:var(--md-border-radius-large);font-size:18px;cursor:pointer;transition:all var(--md-transition-duration-short) var(--md-transition-easing-standard);justify-content:center;width:48px;height:48px;position:relative;overflow:hidden}#pdf-toolbar button:hover{background:rgba(255,255,255,.12);box-shadow:var(--md-shadow-2)}#pdf-toolbar button:hover::before{opacity:.04}#pdf-toolbar button:active{transform:scale(.96);box-shadow:var(--md-shadow-1)}#pdf-toolbar button:disabled{opacity:.38;cursor:not-allowed;box-shadow:none}#pdf-toolbar button i{font-size:20px}#pdf-toolbar span{font-size:16px;text-align:center;flex-grow:1;padding:0 16px;letter-spacing:.5px}.PDFtextLayer span{position:absolute!important}.PDFtextLayer{position:absolute;top:0;left:0;width:100%;height:100%}#pdf-container{margin-top:96px;flex:none;display:flex;flex-direction:column;align-items:center;gap:20px;overflow:visible;position:relative;width:100%;font-family:var(--md-font-family)}#pdf-container .ocr-container{position:relative;width:100%;box-shadow:var(--md-shadow-2);border-radius:var(--md-border-radius-medium);overflow:hidden;background:var(--md-surface-50)}#pdf-container canvas{width:100%!important;height:auto!important;display:block;border-radius:var(--md-border-radius-medium)}#pdfOptionsOverlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.32);justify-content:center;z-index:10000;padding:24px;animation:md-fadein var(--md-transition-duration-long) var(--md-transition-easing-decelerate);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px)}#pdfOptionsModal{background:var(--md-surface-50);border-radius:var(--md-border-radius-extra-large);padding:24px;width:100%;max-width:400px;box-shadow:var(--md-shadow-12);font-family:var(--md-font-family);color:var(--md-surface-900);opacity:0;transform:translateY(16px) scale(.95);animation:md-slide-up var(--md-transition-duration-long) var(--md-transition-easing-decelerate) forwards}#pdfOptionsModal h2{margin-top:0;font-size:24px;font-weight:var(--md-font-weight-regular);color:var(--md-surface-900);text-align:center;margin-bottom:24px;letter-spacing:.15px}#pdfOptionsModal form>div{margin-bottom:20px}#pdfOptionsModal label{color:var(--md-surface-700);font-size:14px;font-weight:var(--md-font-weight-medium);margin-left:12px;letter-spacing:.25px}#pdfOptionsModal input[type=number],#pdfOptionsModal input[type=text]{width:calc(100% - 24px);padding:16px 12px;margin-top:8px;border:1px solid var(--md-surface-400);border-radius:var(--md-border-radius-small);font-size:16px;font-family:var(--md-font-family);color:var(--md-surface-900);background:var(--md-surface-50);transition:border-color var(--md-transition-duration-short) var(--md-transition-easing-standard),box-shadow var(--md-transition-duration-short) var(--md-transition-easing-standard)}#pdfOptionsModal .quality-container label,#pdfOptionsModal .quality-container span,#pdfOptionsModal button{font-size:14px;font-weight:var(--md-font-weight-medium)}#pdfOptionsModal input[type=number]:focus,#pdfOptionsModal input[type=text]:focus{outline:0;border-color:var(--md-primary-500);box-shadow:0 0 0 2px rgba(33,150,243,.2)}#pdfOptionsModal input[type=radio]{appearance:none;-webkit-appearance:none;border:2px solid var(--md-surface-400);border-radius:50%;margin-right:12px}#pdfOptionsModal input[type=radio]:checked{border-color:var(--md-primary-500)}#pdfOptionsModal input[type=radio]:checked::before{content:"";position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:10px;height:10px;background:var(--md-primary-500);border-radius:50%}#pdfOptionsModal .quality-container{display:flex;align-items:center;justify-content:center;gap:12px;margin:16px 0}#pdfOptionsModal .quality-container label{color:var(--md-surface-700)}#pdfOptionsModal .quality-container input[type=range]{flex:1;margin:0}#pdfOptionsModal .quality-container span{width:48px;text-align:center;color:var(--md-primary-500);background:var(--md-primary-50);padding:4px 8px;border-radius:var(--md-border-radius-small)}#pdfOptionsModal input[type=range]{appearance:none;-webkit-appearance:none;width:100%;height:4px;border-radius:2px;background:var(--md-surface-300);outline:0;transition:background var(--md-transition-duration-short) var(--md-transition-easing-standard)}#pdfOptionsModal input[type=range]::-webkit-slider-runnable-track{width:100%;height:4px;cursor:pointer;background:var(--md-surface-300);border-radius:2px}#pdfOptionsModal input[type=range]::-webkit-slider-thumb{appearance:none;-webkit-appearance:none;width:20px;height:20px;border-radius:50%;background:var(--md-primary-500);cursor:pointer;transition:all var(--md-transition-duration-short) var(--md-transition-easing-standard);box-shadow:var(--md-shadow-1);margin-top:-8px}#pdfOptionsModal input[type=range]::-webkit-slider-thumb:hover{background:var(--md-primary-600);transform:scale(1.1);box-shadow:var(--md-shadow-2)}#pdfOptionsModal .button-group{display:flex;justify-content:flex-end;gap:12px;margin-top:32px}#pdfOptionsModal button{padding:12px 24px;font-family:var(--md-font-family);border:none;border-radius:var(--md-border-radius-large);cursor:pointer;text-transform:uppercase;letter-spacing:.75px;min-width:64px;position:relative;overflow:hidden;transition:all var(--md-transition-duration-short) var(--md-transition-easing-standard)}#pdfOptionsModal button#cancelPdfOptions{background:0 0;color:var(--md-surface-600);border:1px solid var(--md-surface-300)}#pdfOptionsModal button#cancelPdfOptions:hover{background:var(--md-surface-100);border-color:var(--md-surface-400)}#pdfOptionsModal button#confirmPdfOptions{background:var(--md-primary-500);color:var(--md-surface-50);box-shadow:var(--md-shadow-2)}#pdfOptionsModal button#confirmPdfOptions:hover{background:var(--md-primary-600)}@media (max-width:768px){.immTransl-arrow,.immTransl-control-btn,.text-retry-button,button{min-width:44px!important;min-height:44px!important}#translationFeedbackBox,.notification{-webkit-text-size-adjust:100%;text-size-adjust:100%}#translationContainer{padding:0!important}input[type=email],input[type=number],input[type=password],input[type=text],textarea{font-size:16px!important}#pdfOptionsModal{padding:20px;max-width:calc(100vw - 40px);border-radius:var(--md-border-radius-large)}#pdfOptionsModal h2{font-size:22px;margin-bottom:20px}#pdfOptionsModal button{padding:14px 20px;font-size:14px;min-width:80px;min-height:44px}#pdfOptionsModal input[type=number],#pdfOptionsModal input[type=text]{padding:14px 12px;font-size:16px}#pdfOptionsOverlay{padding:20px}#pdf-toolbar{width:95%;height:60px;padding:0 16px;top:12px}#pdf-toolbar button{width:42px;height:42px;margin:0 2px;font-size:16px;min-width:44px;min-height:44px}#pdf-toolbar button i{font-size:18px}#pdf-toolbar span{font-size:15px;padding:0 12px}#pdf-container{margin-top:88px;gap:16px;width:100%}#pdf-toolbar #pageIndicator,#pdf-toolbar #zoomIndicator{font-size:13px}}@media (max-width:480px){#translationFeedbackBox{min-width:200px!important}.notification{min-width:180px!important}.immTransl-arrow,.immTransl-control-btn,.text-retry-button,button{min-width:40px!important;min-height:40px!important}#pdfOptionsModal .quality-container{flex-direction:column;align-items:center}#pdfOptionsModal{padding:16px;max-width:calc(100vw - 24px);border-radius:var(--md-border-radius-medium)}#pdfOptionsModal h2{font-size:20px;margin-bottom:16px}#pdfOptionsModal button{padding:12px 16px;font-size:14px;min-width:72px;min-height:44px}#pdfOptionsModal button#confirmPdfOptions{flex:1}#pdfOptionsModal .quality-container{flex-direction:column;align-items:stretch;gap:12px}#pdfOptionsModal .quality-container input[type=range]{width:100%;margin:8px 0}#pdfOptionsModal .quality-container span{text-align:center;align-self:center}#pdfOptionsModal input[type=number],#pdfOptionsModal input[type=text]{padding:12px 10px;font-size:16px;width:calc(100% - 20px)}#pdfOptionsOverlay{padding:12px}#pdf-toolbar{height:56px;padding:0 12px;top:8px}#pdf-toolbar button{width:38px;height:38px;margin:0 1px;font-size:14px}#pdf-toolbar button i{font-size:16px}#pdf-toolbar span{font-size:14px;padding:0 8px}#pdf-container{margin-top:80px;gap:12px;width:100%}#pdf-toolbar #pageIndicator,#pdf-toolbar #zoomIndicator{font-size:12px}.ocr-box{padding:1px 2px!important;border-radius:4px!important}.ocr-overlay{padding:2px 4px!important}}\n', 
             document.head.appendChild(style);
         }
         initUI() {
@@ -512,6 +538,7 @@
             document.getElementById("translationContainer").classList.remove("hidden");
             const box = document.getElementById("translationFeedbackBox");
             setTimeout(() => {
+                if (!box || !box.parentElement) return;
                 box.classList.add("fade-out"), box.addEventListener("animationend", () => {
                     box.remove(), document.getElementById("translationContainer").classList.remove("hidden");
                 });
@@ -546,10 +573,30 @@
                 translationPaused && (ImmUtils.resumeTranslation(BaseUIManager.showNotification, this.updateFeedback), 
                 resumeBtn.disabled = !0, pauseBtn.disabled = !1);
             }), cancelBtn.addEventListener("click", () => {
-                translationCanceled || (ImmUtils.cancelTranslation(BaseUIManager.showNotification, this.updateFeedback), 
-                pauseBtn.disabled = !0, resumeBtn.disabled = !0, cancelBtn.disabled = !0, this.removeFeedback(0), 
-                download && (document.getElementById("downloadPdf").disabled = !1), document.querySelectorAll(".text-spinner, .text-retry-button").forEach(el => el.remove()));
-            }), controlContainer.appendChild(pauseBtn), controlContainer.appendChild(resumeBtn), 
+                translationCanceled || (ImmUtils.cancelTranslation(BaseUIManager.showNotification, this.updateFeedback),
+                this._translationStopped = !0,
+                pauseBtn.disabled = !0, resumeBtn.disabled = !0, cancelBtn.disabled = !0, this.removeFeedback(0),
+                download && (document.getElementById("downloadPdf").disabled = !1), document.querySelectorAll(".text-spinner, .text-retry-button").forEach(el => el.remove()),
+                document.querySelectorAll(".ocr-box").forEach(box => {
+                    if (box.querySelector(":scope > .spinner")) return void box.remove();
+                    const info = box.getAttribute("data-ocr-info");
+                    if (!info) return void box.remove();
+                    try { const d = JSON.parse(info); d.translatedText && "" !== d.translatedText && "[[ERROR]]" !== d.translatedText || box.remove(); } catch (e) { box.remove(); }
+                }),
+                setTimeout(() => {
+                    document.querySelectorAll(".ocr-box").forEach(box => {
+                        if (box.querySelector(":scope > .spinner")) return void box.remove();
+                        const info = box.getAttribute("data-ocr-info");
+                        if (!info) return void box.remove();
+                        try { const d = JSON.parse(info); d.translatedText && "" !== d.translatedText && "[[ERROR]]" !== d.translatedText || box.remove(); } catch (e) { box.remove(); }
+                    });
+                }, 500),
+                this.pageContainers && this.pageContainers.forEach(c => {
+                    if (!c._translationCache) return;
+                    const valid = c._translationCache.blocks.filter(b => b && b.translatedText && "" !== b.translatedText && "[[ERROR]]" !== b.translatedText);
+                    valid.length > 0 ? c._translationCache = { blocks: valid } : delete c._translationCache;
+                }));
+            }), controlContainer.appendChild(pauseBtn), controlContainer.appendChild(resumeBtn),
             controlContainer.appendChild(cancelBtn), controlContainer;
         }
         createTranslationContainer() {
@@ -602,6 +649,7 @@
             document.getElementById("translationContainer").classList.remove("hidden");
             const box = document.getElementById("translationFeedbackBox");
             setTimeout(() => {
+                if (!box || !box.parentElement) return;
                 box.classList.add("fade-out"), box.addEventListener("animationend", () => {
                     box.remove(), document.getElementById("translationContainer").classList.remove("hidden");
                 });
@@ -643,11 +691,32 @@
         async exportPdfCallback() {
             const containers = document.querySelectorAll(".ocr-container");
             if (0 === containers.length) return;
-            const maxPages = containers.length, options = await PDFUIManager.showPdfOptionsModal(maxPages), pdfExporter = new PdfExporterFacade, exportCommand = new ExportPdfCommand(pdfExporter);
+            containers.forEach(c => c.querySelectorAll(".ocr-box").forEach(box => {
+                const info = box.getAttribute("data-ocr-info");
+                if (!info) return void box.remove();
+                try { const d = JSON.parse(info); d.translatedText && "" !== d.translatedText || box.remove(); } catch (e) { box.remove(); }
+            }));
+            this._exporting = !0;
             try {
-                await exportCommand.execute(options, PDFUIManager.showNotification);
-            } catch (error) {
-                PDFUIManager.showNotification(error, "error");
+                const unrendered = Array.from(containers).filter(c => "placeholder" === c.dataset.pageState || "rendering" === c.dataset.pageState);
+                if (unrendered.length > 0) {
+                    BaseUIManager.showNotification("Rendering remaining pages for export...", "warning");
+                    for (const c of unrendered) {
+                        while ("rendering" === c.dataset.pageState) await ImmUtils.sleep(100);
+                        if ("placeholder" === c.dataset.pageState && this.pdfDoc) {
+                            await ProcessPdfPageFacede.renderPage(this.pdfDoc, parseInt(c.dataset.pageNum), c);
+                            if (c._translationCache) this._applyCachedTranslation(c);
+                        }
+                    }
+                }
+                const maxPages = containers.length, options = await PDFUIManager.showPdfOptionsModal(maxPages), pdfExporter = new PdfExporterFacade, exportCommand = new ExportPdfCommand(pdfExporter);
+                try {
+                    await exportCommand.execute(options, PDFUIManager.showNotification);
+                } catch (error) {
+                    PDFUIManager.showNotification(error, "error");
+                }
+            } finally {
+                this._exporting = !1;
             }
         }
         buildPdfViewer() {
@@ -660,7 +729,7 @@
             let pdfContainer = document.getElementById("pdf-container");
             pdfContainer || (pdfContainer = document.createElement("div"), pdfContainer.id = "pdf-container", 
             viewer.appendChild(pdfContainer));
-            document.getElementById("downloadPdf").addEventListener("click", this.exportPdfCallback);
+            document.getElementById("downloadPdf").addEventListener("click", this.exportPdfCallback.bind(this));
         }
         static async showPdfOptionsModal(maxPages) {
             return new Promise((resolve, reject) => {
@@ -715,31 +784,22 @@
             });
         }
         applyZoom() {
-            const pdf_viewer = document.getElementById("pdf-viewer");
-            if (!pdf_viewer) return;
-            const viewerRect = pdf_viewer.getBoundingClientRect(), visibleLeft = Math.max(viewerRect.left, 0), visibleTop = Math.max(viewerRect.top, 0), visibleCenterX = (visibleLeft + Math.min(viewerRect.right, window.innerWidth)) / 2, visibleCenterY = (visibleTop + Math.min(viewerRect.bottom, window.innerHeight)) / 2, viewportCenterX = window.scrollX + visibleCenterX, viewportCenterY = window.scrollY + visibleCenterY, viewerLeft = viewerRect.left + window.scrollX, viewerTop = viewerRect.top + window.scrollY, relativeCenterX = viewportCenterX - viewerLeft, relativeCenterY = viewportCenterY - viewerTop, oldZoom = this.zoomFactorOld || 1, newZoom = this.zoomFactor, contentX = relativeCenterX / oldZoom, contentY = relativeCenterY / oldZoom;
-            if (pdf_viewer.style.transition = "transform 0.05s ease", newZoom < 1) {
-                this.currentPageIndex;
-                pdf_viewer.style.transformOrigin = "top center", pdf_viewer.style.transform = `scale(${newZoom})`;
-                const newCenterY = viewerTop + contentY * newZoom, newScrollY = (window.innerWidth, 
-                newCenterY - window.innerHeight / 2);
-                window.scrollTo({
-                    top: newScrollY
-                });
-            } else {
-                pdf_viewer.style.transformOrigin = "top left", pdf_viewer.style.transform = `scale(${newZoom})`;
-                const newCenterY = viewerTop + contentY * newZoom, newScrollX = viewerLeft + contentX * newZoom - window.innerWidth / 2, newScrollY = newCenterY - window.innerHeight / 2;
-                window.scrollTo({
-                    left: newScrollX,
-                    top: newScrollY
-                });
-            }
-            this.zoomFactorOld = newZoom;
+            const pdfContainer = document.getElementById("pdf-container");
+            if (!pdfContainer || !this.baseWidth) return;
+            const scrollRatio = window.scrollY / Math.max(document.documentElement.scrollHeight - window.innerHeight, 1);
+            pdfContainer.style.width = (this.baseWidth * this.zoomFactor) + "px";
+            requestAnimationFrame(() => {
+                const newMaxScroll = document.documentElement.scrollHeight - window.innerHeight;
+                window.scrollTo({top: scrollRatio * newMaxScroll});
+                this._adjustAllFontSizes();
+            });
         }
-        updateOcrBoxesForZoom(container) {
-            if (0 === container.querySelectorAll(".ocr-box").length) return;
-            const canvas = container.querySelector("canvas");
-            canvas && OCRStrategy.updateOverlay(canvas, null, null);
+        _adjustAllFontSizes() {
+            this.pageContainers.forEach(container => {
+                container.querySelectorAll(".ocr-box").forEach(box => {
+                    try { OCRStrategy.adjustFontSize(box); } catch(e) {}
+                });
+            });
         }
         zoomIn() {
             this.zoomFactor < this.maxZoom && (this.zoomFactor = Math.min(this.maxZoom, this.zoomFactor + this.zoomStep), 
@@ -763,11 +823,15 @@
             if (this.pageContainers.forEach((container, index) => {
                 container.style.display = "block";
             }), this.pageContainers[this.currentPageIndex]) {
-                this.pageContainers[this.currentPageIndex].scrollIntoView({
+                const target = this.pageContainers[this.currentPageIndex];
+                target.scrollIntoView({
                     behavior: "smooth",
                     block: "start"
                 });
-                this.pageContainers[this.currentPageIndex].querySelector("canvas");
+                target.querySelector("canvas");
+                if ("placeholder" === target.dataset.pageState) {
+                    this._queueRender(target);
+                }
             }
         }
         addToolbarListeners(pdfDoc, worker, translator, scale) {
@@ -784,13 +848,17 @@
         }
         async createPdfPages(pdfDoc) {
             this.totalPages = pdfDoc.numPages;
-            const pageProcessor = new ProcessPdfPageFacede, processCommand = new ProcessPdfPageCommand(pageProcessor), observer = new IntersectionObserver(entries => {
+            this.pdfDoc = pdfDoc;
+            this._renderingPages = new Set();
+            this._renderQueue = new Set();
+            this._drainingQueue = !1;
+            const pageTrackingObserver = new IntersectionObserver(entries => {
                 entries.forEach(entry => {
                     const requiredVisibility = (() => {
                         const viewportWidth = window.innerWidth;
                         return viewportWidth <= 600 ? .5 : viewportWidth <= 1200 ? .35 : viewportWidth <= 1800 ? .25 : .15;
                     })();
-                    entry.isIntersecting && entry.intersectionRatio * this.zoomFactor >= requiredVisibility && (this.currentPageIndex = Array.from(this.pageContainers).indexOf(entry.target), 
+                    entry.isIntersecting && entry.intersectionRatio >= requiredVisibility && (this.currentPageIndex = Array.from(this.pageContainers).indexOf(entry.target),
                     this.updatePageIndicator());
                 });
             }, {
@@ -799,12 +867,290 @@
                 rootMargin: "0px"
             });
             this.pageContainers = [];
+            const firstPage = await pdfDoc.getPage(1);
+            const initScale = Math.min(window.devicePixelRatio || 1, 2);
+            const initViewport = firstPage.getViewport({ scale: initScale, dontFlip: !1 });
+            const pdfContainer = document.getElementById("pdf-container");
+            this.baseWidth = Math.min(initViewport.width, pdfContainer ? pdfContainer.parentElement.clientWidth : window.innerWidth);
+            pdfContainer && (pdfContainer.style.width = this.baseWidth + "px");
             for (let pageNum = 1; pageNum <= this.totalPages; pageNum++) {
-                const container = await processCommand.execute(pdfDoc, pageNum);
-                this.pageContainers.push(container), observer.observe(container);
+                const container = await ProcessPdfPageFacede.createPlaceholder(pdfDoc, pageNum);
+                this.pageContainers.push(container), pageTrackingObserver.observe(container);
             }
-            return this.currentPageIndex = 0, this.showCurrentPage(), this.addToolbarListeners(), 
+            this.renderObserver = new IntersectionObserver(entries => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        const container = entry.target;
+                        if ("placeholder" === container.dataset.pageState) {
+                            this._queueRender(container);
+                        }
+                    }
+                });
+            }, {
+                root: null,
+                rootMargin: "100% 0px"
+            });
+            this.unloadObserver = new IntersectionObserver(entries => {
+                entries.forEach(entry => {
+                    if (!entry.isIntersecting) {
+                        const container = entry.target;
+                        const state = container.dataset.pageState;
+                        if ("rendered" === state || "translated" === state) {
+                            this._unloadPage(container);
+                        }
+                    }
+                });
+            }, {
+                root: null,
+                rootMargin: "200% 0px"
+            });
+            this.pageContainers.forEach(c => {
+                this.renderObserver.observe(c);
+                this.unloadObserver.observe(c);
+            });
+            const initialPages = Math.min(3, this.totalPages);
+            for (let i = 0; i < initialPages; i++) {
+                await this._renderPage(this.pageContainers[i]);
+            }
+            return this.currentPageIndex = 0, this.showCurrentPage(), this.addToolbarListeners(),
             this.updateZoomIndicator(), this.pageContainers;
+        }
+        _queueRender(container) {
+            if ("placeholder" !== container.dataset.pageState) return;
+            this._renderQueue.add(container);
+            this._drainRenderQueue();
+        }
+        async _drainRenderQueue() {
+            if (this._drainingQueue) return;
+            this._drainingQueue = !0;
+            while (this._renderQueue.size > 0 && this._renderingPages.size < 2) {
+                let best = null, bestDist = 1 / 0;
+                for (const c of this._renderQueue) {
+                    if ("placeholder" !== c.dataset.pageState) { this._renderQueue.delete(c); continue; }
+                    const dist = Math.abs(this.pageContainers.indexOf(c) - this.currentPageIndex);
+                    dist < bestDist && (bestDist = dist, best = c);
+                }
+                if (!best) break;
+                this._renderQueue.delete(best);
+                await this._renderPage(best);
+            }
+            this._drainingQueue = !1;
+        }
+        _unloadPage(container) {
+            if (this._exporting) return;
+            const pageNum = parseInt(container.dataset.pageNum);
+            if (this._renderingPages.has(pageNum)) return;
+            const canvas = container.querySelector("canvas");
+            if (!canvas) return;
+            const ocrBoxes = Array.from(container.querySelectorAll(".ocr-box"))
+                .sort((a, b) => parseInt(a.getAttribute("data-ocr-index"), 10) - parseInt(b.getAttribute("data-ocr-index"), 10));
+            if (ocrBoxes.length > 0) {
+                const blocks = ocrBoxes.map(box => {
+                    try {
+                        const data = JSON.parse(box.getAttribute("data-ocr-info"));
+                        if (!data.translatedText || "" === data.translatedText || "[[ERROR]]" === data.translatedText) return null;
+                        data._cachedStyles = {
+                            background: box.style.background,
+                            color: box.style.color,
+                            writingMode: box.style.writingMode,
+                            transform: box.style.transform,
+                            transformOrigin: box.style.transformOrigin,
+                            rotation: box.dataset.rotation || "0"
+                        };
+                        return data;
+                    } catch (e) { return null; }
+                }).filter(b => b !== null);
+                if (blocks.length > 0) container._translationCache = { blocks: blocks };
+            }
+            ocrBoxes.forEach(b => b.remove());
+            container._ocrBoxes = null;
+            canvas.width = 0;
+            canvas.height = 0;
+            canvas.remove();
+            container.style.background = "#fafafa";
+            container.dataset.pageState = "placeholder";
+        }
+        _enforceMaxRendered() {
+            if (this._exporting) return;
+            const MAX_RENDERED = 8;
+            const rendered = this.pageContainers.filter(c => {
+                const s = c.dataset.pageState;
+                return ("rendered" === s || "translated" === s) && !this._renderingPages.has(parseInt(c.dataset.pageNum));
+            });
+            if (rendered.length <= MAX_RENDERED) return;
+            const current = this.currentPageIndex;
+            rendered.sort((a, b) => {
+                const distA = Math.abs(this.pageContainers.indexOf(a) - current);
+                const distB = Math.abs(this.pageContainers.indexOf(b) - current);
+                return distB - distA;
+            });
+            for (let i = 0; i < rendered.length - MAX_RENDERED; i++) {
+                this._unloadPage(rendered[i]);
+            }
+        }
+        async _renderPage(container) {
+            const pageNum = parseInt(container.dataset.pageNum);
+            if ("placeholder" !== container.dataset.pageState || this._renderingPages.has(pageNum)) return;
+            this._renderingPages.add(pageNum);
+            try {
+                await ProcessPdfPageFacede.renderPage(this.pdfDoc, pageNum, container);
+                if ("rendered" === container.dataset.pageState) {
+                    if (container._translationCache) {
+                        this._applyCachedTranslation(container);
+                    } else if (!this._translationStopped && !ImmUtils.isCancelled()) {
+                        this._createPreviewBoxes(container);
+                    }
+                }
+            } finally {
+                this._renderingPages.delete(pageNum);
+                this._enforceMaxRendered();
+                this._drainRenderQueue();
+            }
+        }
+        _createPreviewBoxes(container) {
+            const canvas = container.querySelector("canvas");
+            if (!canvas || !canvas.pdfTextContent) return;
+            const {text: textPage, viewport} = canvas.pdfTextContent;
+            if (!textPage || !textPage.items || 0 === textPage.items.length) return;
+            const ocrResult = PdfPageOCRStrategy.mapPdfTextToOcrResult(textPage, viewport);
+            const filteredLines = ocrResult.data.lines.filter(l => "" !== l.text.trim());
+            if (0 === filteredLines.length) return;
+            const rawOcrData = filteredLines.map(line => ({
+                bbox: line.bbox, baseline: line.baseline, translatedText: "", text: line.text.trim()
+            }));
+            const blocks = OCRStrategy.groupOcrData(rawOcrData, 18);
+            if (0 === blocks.length) return;
+            canvas.ocrBaseWidth = canvas.width, canvas.ocrBaseHeight = canvas.height;
+            const baseWidth = canvas.ocrBaseWidth, baseHeight = canvas.ocrBaseHeight;
+            const boxesVisible = translationActive;
+            const fragment = document.createDocumentFragment();
+            blocks.forEach((block, i) => {
+                if (!block) return;
+                const box = document.createElement("div");
+                box.className = "ocr-box", box.dataset.index = i,
+                box.setAttribute("data-ocr-index", i),
+                box.setAttribute("data-ocr-info", JSON.stringify(block));
+                if (!boxesVisible) box.style.display = "none";
+                const {bbox, baseline} = block;
+                box.style.setProperty("--pos-x", `${(bbox.x0 / baseWidth) * 100}%`),
+                box.style.setProperty("--pos-y", `${(bbox.y0 / baseHeight) * 100}%`),
+                box.style.setProperty("--box-width", `${((bbox.x1 - bbox.x0) / baseWidth) * 100}%`),
+                box.style.setProperty("--box-height", `${((bbox.y1 - bbox.y0) / baseHeight) * 100}%`);
+                this._applyRotationFromBaseline(box, bbox, baseline);
+                const spinner = document.createElement("div");
+                spinner.className = "spinner", box.appendChild(spinner);
+                box.style.cursor = "default", box.contentEditable = "false";
+                fragment.appendChild(box);
+            });
+            container.appendChild(fragment);
+            container._hasPreviewBoxes = !0;
+        }
+        _applyRotationFromBaseline(box, bbox, baseline) {
+            if (!baseline || void 0 === baseline.x0 || void 0 === baseline.y0 || void 0 === baseline.x1 || void 0 === baseline.y1) {
+                box.dataset.rotation = 0;
+                return;
+            }
+            let angleDeg = 0, isVertical = !1;
+            const dx = baseline.x1 - baseline.x0, dy = baseline.y1 - baseline.y0;
+            const threshold = Math.sqrt(dx * dx + dy * dy) * Math.cos(80 * Math.PI / 180);
+            if (Math.abs(dx) < threshold) {
+                isVertical = !0;
+                const bw = bbox.x1 - bbox.x0;
+                bbox.y1 - bbox.y0 < 1.5 * bw && (angleDeg = Math.atan2(dy, dx) * (180 / Math.PI),
+                angleDeg > 90 ? angleDeg -= 180 : angleDeg < -90 && (angleDeg += 180));
+            } else angleDeg = Math.atan2(dy, dx) * (180 / Math.PI),
+                angleDeg > 90 ? angleDeg -= 180 : angleDeg < -90 && (angleDeg += 180);
+            let rotationTransform = "";
+            isVertical ? 90 !== angleDeg && -90 !== angleDeg ? (box.style.writingMode = "vertical-rl",
+            box.style.transformOrigin = "center center") : (box.style.transformOrigin = "bottom left",
+            dy < 0 && (rotationTransform = `rotate(${angleDeg}deg) scaleX(1)`)) : (rotationTransform = `rotate(${angleDeg}deg)`,
+            box.style.transformOrigin = "top left");
+            box.dataset.rotation = angleDeg, box.style.transform = rotationTransform;
+        }
+        _applyCachedTranslation(container) {
+            if (this._translationStopped && !container._translationCache) return;
+            const cache = container._translationCache;
+            if (!cache || !cache.blocks || 0 === cache.blocks.length) return;
+            const canvas = container.querySelector("canvas");
+            if (!canvas) return;
+            if (container._hasPreviewBoxes) {
+                container.querySelectorAll(".ocr-box").forEach(b => b.remove());
+                container._ocrBoxes = null;
+                delete container._hasPreviewBoxes;
+            }
+            canvas.ocrBaseWidth = canvas.width, canvas.ocrBaseHeight = canvas.height,
+            canvas.dataset.ocrProcessed = "true", container.dataset.pageState = "translated";
+            if (this.ocrManager) canvas.ocrTranslator = this.ocrManager.getTranslatorService();
+            const baseWidth = canvas.ocrBaseWidth, baseHeight = canvas.ocrBaseHeight;
+            const boxesVisible = translationActive;
+            const fragment = document.createDocumentFragment();
+            const createdBoxes = [];
+            cache.blocks.forEach((block, i) => {
+                if (!block) return;
+                const box = document.createElement("div");
+                box.className = "ocr-box", box.dataset.index = i,
+                box.setAttribute("data-ocr-index", i),
+                box.setAttribute("data-ocr-info", JSON.stringify(block));
+                box._keydownHandler = function(e) {
+                    if ("Backspace" === e.key && "" === box.innerText.trim()) {
+                        e.preventDefault(), box.remove();
+                    }
+                }, box.addEventListener("keydown", box._keydownHandler), box._beforeinputHandler = function(e) {
+                    if ("deleteContentBackward" === e.inputType && "" === box.innerText.trim()) {
+                        e.preventDefault(), box.remove();
+                    }
+                }, box.addEventListener("beforeinput", box._beforeinputHandler);
+                if (!boxesVisible) box.style.display = "none";
+                const {bbox, baseline, translatedText} = block;
+                box.style.setProperty("--pos-x", `${(bbox.x0 / baseWidth) * 100}%`),
+                box.style.setProperty("--pos-y", `${(bbox.y0 / baseHeight) * 100}%`),
+                box.style.setProperty("--box-width", `${((bbox.x1 - bbox.x0) / baseWidth) * 100}%`),
+                box.style.setProperty("--box-height", `${((bbox.y1 - bbox.y0) / baseHeight) * 100}%`);
+                if (block._cachedStyles) {
+                    const s = block._cachedStyles;
+                    s.background && (box.style.background = s.background);
+                    s.color && (box.style.color = s.color);
+                    s.writingMode && (box.style.writingMode = s.writingMode);
+                    s.transform && (box.style.transform = s.transform);
+                    s.transformOrigin && (box.style.transformOrigin = s.transformOrigin);
+                    s.rotation && (box.dataset.rotation = s.rotation);
+                } else {
+                    this._applyRotationFromBaseline(box, bbox, baseline);
+                }
+                if (translatedText && "" !== translatedText && "[[ERROR]]" !== translatedText) {
+                    const textEl = document.createElement("div");
+                    textEl.className = "ocr-box-text", textEl.innerHTML = translatedText, box.appendChild(textEl);
+                } else if ("[[ERROR]]" === translatedText) {
+                    const btn = document.createElement("button");
+                    btn.className = "ocr-retry-btn", btn.textContent = "\u21BB";
+                    canvas.ocrTranslator && (btn.onclick = function(e) {
+                        e.preventDefault(), e.stopPropagation(),
+                        OCRStrategy.retryOcrBoxTranslation(canvas, i, canvas.ocrTranslator);
+                    });
+                    box.appendChild(btn), box.classList.add("ocr-box-error");
+                }
+                fragment.appendChild(box);
+                createdBoxes.push({ box: box, block: block, bbox: bbox, index: i });
+            });
+            container.appendChild(fragment);
+            if (boxesVisible) {
+                createdBoxes.forEach(({ box, block, bbox, index }) => {
+                    if (!block._cachedStyles) {
+                        OCRStrategy.calculateBoxColor(block, canvas, null, bbox, box, index);
+                    }
+                    try { OCRStrategy.adjustFontSize(box); } catch (e) {}
+                });
+            }
+            if (!container._lazyDragInit) {
+                container._lazyDragInit = !0;
+                container.addEventListener("pointerdown", function(e) {
+                    const box = e.target.closest(".ocr-box");
+                    if (box && !OCRStrategy._initializedBoxes.has(box)) {
+                        OCRStrategy.initSingleBoxDragResize(box, box.parentElement, canvas, null);
+                    }
+                });
+            }
+            delete container._translationCache;
         }
         static enableDownloadButton() {
             document.getElementById("downloadPdf").disabled = !1;
@@ -885,7 +1231,7 @@
             this.worker = await Tesseract.createWorker(this.languages), this.tesseractOptions && await this.worker.setParameters(this.tesseractOptions);
         }
         async terminateEngine() {
-            this.worker && await this.worker.terminate();
+            this.worker && (await this.worker.terminate(), this.worker = null);
         }
         async recognize(element, options) {
             const extraOptions = {
@@ -965,6 +1311,7 @@
         }
         static updateBoxesInChunks(element, boxes, offsetX = 0, offsetY = 0, zoomFactor = 1, corsFreeCanvas, lastTranslatedIndex, translator = null) {
             const currTranslator = translator || element.ocrTranslator;
+            const baseW = element.ocrBaseWidth || element.width, baseH = element.ocrBaseHeight || element.height;
             if (1 === boxes.length) {
                 let b = boxes[0];
                 const data = b?.getAttribute("data-ocr-info");
@@ -985,15 +1332,15 @@
             }
             let currentIndex = 0;
             function updateBox(box, data, boxIndex) {
-                if (!box) return;
+                if (!box || !box.parentElement || ImmUtils.isCancelled()) return;
                 const html = box.innerHTML.trim(), {bbox: bbox, translatedText: translatedText, baseline: baseline} = data;
-                let x, y, boxWidth, boxHeight;
-                if (x = offsetX + bbox.x0 * zoomFactor, y = offsetY + bbox.y0 * zoomFactor, boxWidth = (bbox.x1 - bbox.x0) * zoomFactor, 
-                boxHeight = (bbox.y1 - bbox.y0) * zoomFactor, box.dataset.lastOffsetX = offsetX, 
-                box.dataset.lastOffsetY = offsetY, box.dataset.lastZoomFactor = zoomFactor, requestAnimationFrame(() => {
-                    box.style.setProperty("--pos-x", `${x}px`), box.style.setProperty("--pos-y", `${y}px`), 
-                    box.style.setProperty("--box-width", `${boxWidth}px`), box.style.setProperty("--box-height", `${boxHeight}px`), 
-                    box.style.setProperty("--zoom-factor", `${zoomFactor}`), box.style.setProperty("--offset-x", `${offsetX}px`), 
+                const xPct = (bbox.x0 / baseW) * 100, yPct = (bbox.y0 / baseH) * 100,
+                    wPct = ((bbox.x1 - bbox.x0) / baseW) * 100, hPct = ((bbox.y1 - bbox.y0) / baseH) * 100;
+                if (box.dataset.lastOffsetX = offsetX, box.dataset.lastOffsetY = offsetY,
+                box.dataset.lastZoomFactor = zoomFactor, requestAnimationFrame(() => {
+                    box.style.setProperty("--pos-x", `${xPct}%`), box.style.setProperty("--pos-y", `${yPct}%`),
+                    box.style.setProperty("--box-width", `${wPct}%`), box.style.setProperty("--box-height", `${hPct}%`),
+                    box.style.setProperty("--zoom-factor", `${zoomFactor}`), box.style.setProperty("--offset-x", `${offsetX}px`),
                     box.style.setProperty("--offset-y", `${offsetY}px`);
                 }), -1 === boxIndex && (html.includes('class="spinner"') || html.includes("ocr-retry-btn"))) return;
                 if (translatedText && "" !== translatedText) if ("[[ERROR]]" === translatedText) {
@@ -1017,9 +1364,9 @@
                     box.style.cursor = "default", box.contentEditable = "false";
                 }
                 if (-1 === boxIndex && "" !== html && !html.includes('class="spinner"') && !html.includes("ocr-retry-btn")) {
-                    try {
-                        OCRStrategy.adjustFontSize(box);
-                    } catch (e) {}
+                    requestAnimationFrame(() => {
+                        try { OCRStrategy.adjustFontSize(box); } catch (e) {}
+                    });
                     return;
                 }
                 let angleDeg = 0, isVertical = !1, dx = 0, dy = 0;
@@ -1044,41 +1391,31 @@
                 } catch (e) {}
             }
             requestAnimationFrame(function updateChunk() {
+                if (ImmUtils.isCancelled()) return;
                 for (let j = 0; j < 5 && currentIndex < boxes.length; j++, currentIndex++) {
                     let b = boxes[currentIndex];
                     const d = b?.getAttribute("data-ocr-info");
                     if (!d) continue;
                     updateBox(b, JSON.parse(d), -1);
                 }
-                currentIndex < boxes.length && setTimeout(updateChunk, 50);
+                currentIndex < boxes.length && !ImmUtils.isCancelled() && setTimeout(updateChunk, 50);
             });
         }
         static updateOverlay(element, corsFreeCanvas = null, iElementData = null, translator = null) {
             const container = element.parentElement;
+            if (!container) return;
             if (!element.ocrData) {
                 const boxes = Array.from(container.querySelectorAll(".ocr-box")).sort((a, b) => parseInt(a.getAttribute("data-ocr-index"), 10) - parseInt(b.getAttribute("data-ocr-index"), 10));
                 if (0 === boxes.length) return;
                 const canvasRect = element.getBoundingClientRect(), containerRect = container.getBoundingClientRect(), baseWidth = element.ocrBaseWidth || canvasRect.width;
-                let pdfZoomFactor = 0;
-                const pdfViewer = document.getElementById("pdf-viewer");
-                if (pdfOCR && pdfViewer && pdfViewer.style.transform) {
-                    const match = pdfViewer.style.transform.match(/scale\(([\d.]+)\)/);
-                    match && match[1] && (pdfZoomFactor = parseFloat(match[1]));
-                }
-                let zoomFactor = pdfZoomFactor > 0 ? canvasRect.width / baseWidth / pdfZoomFactor : canvasRect.width / baseWidth;
+                let zoomFactor = canvasRect.width / baseWidth;
                 const offsetX = canvasRect.left - containerRect.left, offsetY = canvasRect.top - containerRect.top;
                 let lastTranslatedIndex = -1;
-                return iElementData >= 0 && (lastTranslatedIndex = iElementData), OCRStrategy.enableDragResizeForBoxes(element, corsFreeCanvas), 
+                return iElementData >= 0 && (lastTranslatedIndex = iElementData), OCRStrategy.enableDragResizeForBoxes(element, corsFreeCanvas),
                 void OCRStrategy.updateBoxesInChunks(element, boxes, offsetX, offsetY, zoomFactor, corsFreeCanvas, lastTranslatedIndex, translator);
             }
             const canvasRect = element.getBoundingClientRect(), containerRect = container.getBoundingClientRect(), baseWidth = element.ocrBaseWidth || canvasRect.width;
-            let pdfZoomFactor = 0;
-            const pdfViewer = document.getElementById("pdf-viewer");
-            if (pdfOCR && pdfViewer && pdfViewer.style.transform) {
-                const match = pdfViewer.style.transform.match(/scale\(([\d.]+)\)/);
-                match && match[1] && (pdfZoomFactor = parseFloat(match[1]));
-            }
-            let zoomFactor = pdfZoomFactor > 0 ? canvasRect.width / baseWidth / pdfZoomFactor : canvasRect.width / baseWidth;
+            let zoomFactor = canvasRect.width / baseWidth;
             const offsetX = canvasRect.left - containerRect.left, offsetY = canvasRect.top - containerRect.top;
             let boxes = container._ocrBoxes || [];
             if (boxes.length < element.ocrData.length) {
@@ -1115,26 +1452,46 @@
                     const ctx = OCRStrategy.getCtxFromElement(img, corsFreeCanvas);
                     if (ctx) {
                         const patchX = Math.floor(bbox.x0), patchY = Math.floor(bbox.y0), patchWidth = Math.max(1, Math.floor(bbox.x1 - bbox.x0)), patchHeight = Math.max(1, Math.floor(bbox.y1 - bbox.y0)), avgColor = OCRStrategy.sampleMedianColor(ctx, patchX, patchY, patchWidth, patchHeight);
-                        box.style.background = `rgba(${avgColor.r}, ${avgColor.g}, ${avgColor.b}, ${avgColor.a / 255})`;
-                        const brightness = (299 * avgColor.r + 587 * avgColor.g + 114 * avgColor.b) / 1e3;
-                        box.style.color = brightness < 128 ? "#fff" : "#000", data.color = avgColor, box.setAttribute("data-ocr-info", JSON.stringify(data));
+                        data.color = avgColor, box.setAttribute("data-ocr-info", JSON.stringify(data));
                     }
+                }
+                if (data.color) {
+                    box.style.background = `rgba(${data.color.r}, ${data.color.g}, ${data.color.b}, ${data.color.a / 255})`;
+                    const brightness = (299 * data.color.r + 587 * data.color.g + 114 * data.color.b) / 1e3;
+                    box.style.color = brightness < 128 ? "#fff" : "#000";
                 }
             } catch (error) {}
         }
         static _initializedBoxes=new WeakSet;
+        static initSingleBoxDragResize(box, img, cnt, canvas = null) {
+            if (OCRStrategy._initializedBoxes.has(box)) return;
+            const container = cnt, baseWidth = img.ocrBaseWidth || img.naturalWidth || img.width, containerRect = container.getBoundingClientRect(), imgRect = img.getBoundingClientRect(), offsetX = imgRect.left - containerRect.left, offsetY = imgRect.top - containerRect.top;
+            const zoomFactor = imgRect.width / baseWidth;
+            OCRStrategy._initBoxHandlers(box, img, canvas, offsetX, offsetY, zoomFactor);
+        }
         static enableDragResizeForBoxes(img, canvas = null) {
             const container = img.parentElement, boxes = container.querySelectorAll(".ocr-box"), baseWidth = img.ocrBaseWidth || img.naturalWidth || img.width, containerRect = container.getBoundingClientRect(), imgRect = img.getBoundingClientRect(), offsetX = imgRect.left - containerRect.left, offsetY = imgRect.top - containerRect.top;
-            let pdfZoomFactor = 0;
-            const pdfViewer = document.getElementById("pdf-viewer");
-            if (pdfOCR && pdfViewer && pdfViewer.style.transform) {
-                const match = pdfViewer.style.transform.match(/scale\(([\d.]+)\)/);
-                match && match[1] && (pdfZoomFactor = parseFloat(match[1]));
-            }
-            let zoomFactor;
-            zoomFactor = pdfZoomFactor > 0 ? imgRect.width / baseWidth / pdfZoomFactor : imgRect.width / baseWidth, 
+            const zoomFactor = imgRect.width / baseWidth;
             boxes.forEach(box => {
                 if (OCRStrategy._initializedBoxes.has(box)) return;
+                OCRStrategy._initBoxHandlers(box, img, canvas, offsetX, offsetY, zoomFactor);
+            });
+        }
+        static _convertBoxToPercentages(box, img) {
+            const parent = box.parentElement;
+            if (!parent) return;
+            const parentW = parent.clientWidth, parentH = parent.clientHeight;
+            if (!parentW || !parentH) return;
+            const computed = getComputedStyle(box);
+            const left = parseFloat(computed.left) || 0, top = parseFloat(computed.top) || 0,
+                width = parseFloat(computed.width) || 0, height = parseFloat(computed.height) || 0;
+            box.style.setProperty("--pos-x", `${(left / parentW) * 100}%`);
+            box.style.setProperty("--pos-y", `${(top / parentH) * 100}%`);
+            box.style.setProperty("--box-width", `${(width / parentW) * 100}%`);
+            box.style.setProperty("--box-height", `${(height / parentH) * 100}%`);
+        }
+        static _initBoxHandlers(box, img, canvas, offsetX, offsetY, zoomFactor) {
+            if (OCRStrategy._initializedBoxes.has(box)) return;
                 const handles = {};
                 [ "top", "right", "bottom", "left" ].forEach(side => {
                     const handle = document.createElement("div");
@@ -1198,8 +1555,8 @@
                             pdfContainer && (pdfContainer.classList.remove("dragging"), pdfContainer.removeEventListener("touchmove", preventDefault, {
                                 passive: !1
                             }));
-                        }(), isDragging = !1, updatePending && (OCRStrategy.updateBoxOcrData(box, offsetX, offsetY, zoomFactor, img, canvas), 
-                        updatePending = !1);
+                        }(), isDragging = !1, updatePending && (OCRStrategy.updateBoxOcrData(box, offsetX, offsetY, zoomFactor, img, canvas),
+                        OCRStrategy._convertBoxToPercentages(box, img), updatePending = !1);
                         let textElement = box.getElementsByClassName("ocr-box-text")[0];
                         textElement && (textElement.contentEditable = "true", textElement.blur()), box.blur(), 
                         e.preventDefault(), e.stopPropagation(), currentDraggingBox = null;
@@ -1241,8 +1598,8 @@
                     function endResize(e) {
                         isResizing && (isResizing = !1, document.removeEventListener("mousemove", onResize), 
                         document.removeEventListener("touchmove", onResize), document.removeEventListener("mouseup", endResize), 
-                        document.removeEventListener("touchend", endResize), updateNeeded && (OCRStrategy.updateBoxOcrData(box, offsetX, offsetY, zoomFactor, img, canvas, !0), 
-                        updateNeeded = !1));
+                        document.removeEventListener("touchend", endResize), updateNeeded && (OCRStrategy.updateBoxOcrData(box, offsetX, offsetY, zoomFactor, img, canvas, !0),
+                        OCRStrategy._convertBoxToPercentages(box, img), updateNeeded = !1));
                     }
                     handle._resizeHandlers && (document.removeEventListener("mousemove", handle._resizeHandlers.mousemove), 
                     document.removeEventListener("touchmove", handle._resizeHandlers.touchmove), document.removeEventListener("mouseup", handle._resizeHandlers.mouseup), 
@@ -1286,7 +1643,6 @@
                     box.style.setProperty("--box-width", origWidth - diffX + "px"), box.style.setProperty("--box-height", `${origHeight + diffY}px`), 
                     box.style.setProperty("--pos-x", `${origLeft + diffX}px`), OCRStrategy.adjustFontSize(box);
                 }), OCRStrategy._initializedBoxes.add(box);
-            });
         }
         static updateBoxOcrData(box, offsetX, offsetY, zoomFactor, img, canvas = null, color = !1) {
             const computed = getComputedStyle(box), newLeft = parseFloat(computed.left), newTop = parseFloat(computed.top), newWidth = parseFloat(computed.width), newHeight = parseFloat(computed.height);
@@ -1505,6 +1861,7 @@
             })), blocks = OCRStrategy.groupOcrData(rawOcrData, groupingThreshold);
             element.ocrData = blocks, "static" === getComputedStyle(container).position && (container.style.position = "relative"), 
             ImmUtils.checkPaused(), ImmUtils.yieldControl(), OCRStrategy.updateOverlay(element, tempCanvas);
+            if (!element.parentElement) return void (element.dataset.ocrProcessed = "true");
             const boxes = Array.from(element.parentElement.querySelectorAll(".ocr-box")).sort((a, b) => parseInt(a.getAttribute("data-ocr-index"), 10) - parseInt(b.getAttribute("data-ocr-index"), 10)), translationPromises = blocks.map(block => block.originalText.replace(/<br>/gi, "[[BR]]")).map((text, i) => (async () => {
                 const translator = this.translator;
                 try {
@@ -1546,10 +1903,16 @@
                 });
             } catch (error) {}
             let container = img.parentElement;
-            container.classList.contains("ocr-container") || (container = document.createElement("div"), 
-            container.classList.add("ocr-container"), container.style.position = "relative", 
-            container.style.display = "flex", img.parentElement.insertBefore(container, img), 
-            container.appendChild(img));
+            if (!container.classList.contains("ocr-container")) {
+                const imgPos = getComputedStyle(img).position;
+                "absolute" === imgPos || "fixed" === imgPos
+                    ? (container.classList.add("ocr-container"),
+                       "static" === getComputedStyle(container).position && (container.style.position = "relative"))
+                    : (container = document.createElement("div"),
+                       container.classList.add("ocr-container"), container.style.position = "relative",
+                       container.style.display = "inline-block", img.parentElement.insertBefore(container, img),
+                       container.appendChild(img));
+            }
             const originalWidth = imageForOCR.naturalWidth, originalHeight = imageForOCR.naturalHeight;
             img.ocrBaseWidth = originalWidth, img.ocrBaseHeight = originalHeight;
             const tempCanvas = document.createElement("canvas");
@@ -1601,14 +1964,17 @@
             container.appendChild(canvas));
             const width = canvas.width, height = canvas.height;
             canvas.ocrBaseWidth = width, canvas.ocrBaseHeight = height;
-            const tempCanvas = document.createElement("canvas");
-            tempCanvas.width = width, tempCanvas.height = height;
-            let result;
-            if (tempCanvas.getContext("2d").drawImage(canvas, 0, 0, width, height), canvas.pdfTextContent) {
-                if (result = PdfPageOCRStrategy.mapPdfTextToOcrResult(canvas.pdfTextContent.text, canvas.pdfTextContent.viewport), 
+            let result, tempCanvas = null;
+            if (canvas.pdfTextContent) {
+                if (result = PdfPageOCRStrategy.mapPdfTextToOcrResult(canvas.pdfTextContent.text, canvas.pdfTextContent.viewport),
                 !result) throw new Error("PDF Text mapping error");
-            } else if (result = await this.adapter.recognize(tempCanvas, {}), !result) throw new Error("PDF OCR error");
-            return await this._processOcrResult(canvas, container, null, result, 18);
+            } else {
+                tempCanvas = document.createElement("canvas");
+                tempCanvas.width = width, tempCanvas.height = height;
+                tempCanvas.getContext("2d").drawImage(canvas, 0, 0, width, height);
+                if (result = await this.adapter.recognize(tempCanvas, {}), !result) throw new Error("PDF OCR error");
+            }
+            return await this._processOcrResult(canvas, container, tempCanvas, result, 18);
         }
     }
     class OCRManager {
@@ -1965,43 +2331,113 @@
         async translatePdf() {
             try {
                 const module = await import("https://cdn.jsdelivr.net/npm/pdfjs-dist@5.0.375/+esm");
-                window.pdfjsLib = module, pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/5.0.375/pdf.worker.mjs", 
+                window.pdfjsLib = module, pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/5.0.375/pdf.worker.mjs",
                 this.uiManager.initUI();
                 const pdfData = atob(base64Data.data);
                 base64Data.data = "", delete base64Data.data;
                 if (!document.getElementById("pdf-container")) throw new Error("Elemento con id 'pdf-container' non trovato.");
                 const pdfDoc = await pdfjsLib.getDocument({
-                    data: pdfData
+                    data: pdfData,
+                    isEvalSupported: !1,
+                    wasmUrl: "https://cdn.jsdelivr.net/npm/pdfjs-dist@5.0.375/wasm/"
                 }).promise;
                 let totalPages = pdfDoc.numPages;
                 this.uiManager.updateFeedback(`(0/${totalPages})`, !0);
+                await this.ocrManager.getOcrEngine().initEngine();
+                this.uiManager.ocrManager = this.ocrManager;
                 let pageContainers = await this.uiManager.createPdfPages(pdfDoc);
                 if (pageContainers.length !== totalPages) throw new Error("Errore nella creazione delle pagine PDF.");
-                let processed = 0;
-                Math.max(1, navigator.hardwareConcurrency - 1);
-                await this.ocrManager.getOcrEngine().initEngine();
-                for (let idx = 0; idx < pageContainers.length; idx++) {
-                    await ImmUtils.checkPaused();
-                    const canvas = pageContainers[idx].querySelector("canvas");
-                    try {
-                        await this.ocrManager.processContent(canvas), processed++, this.uiManager.updateFeedback(`(${processed}/${totalPages})`);
-                    } catch (error) {
-                        processed++, this.uiManager.updateFeedback(`Error on page ${idx + 1}`);
-                    }
-                    await ImmUtils.yieldControl();
+                const scale = Math.max(window.devicePixelRatio || 1, 2);
+                const translator = this.ocrManager.getTranslatorService();
+                const renderedIndices = [], otherIndices = [];
+                for (let i = 0; i < pageContainers.length; i++) {
+                    if ("placeholder" !== pageContainers[i].dataset.pageState) renderedIndices.push(i);
+                    else otherIndices.push(i);
                 }
-                await this.ocrManager.getOcrEngine().terminateEngine(), this.uiManager.updateFeedback("Done!", !1);
+                const translationOrder = [...renderedIndices, ...otherIndices];
+                let processed = 0;
+                const translatePage = async (idx) => {
+                    await ImmUtils.checkPaused();
+                    const pageNum = idx + 1;
+                    const page = await pdfDoc.getPage(pageNum);
+                    const textPage = await page.getTextContent();
+                    const viewport = page.getViewport({ scale: scale, dontFlip: !1 });
+                    if (textPage.items.length > 0) {
+                        const ocrResult = PdfPageOCRStrategy.mapPdfTextToOcrResult(textPage, viewport);
+                        const filteredLines = ocrResult.data.lines.filter(l => "" !== l.text.trim());
+                        if (filteredLines.length > 0) {
+                            const rawOcrData = filteredLines.map(line => ({
+                                bbox: line.bbox, baseline: line.baseline, translatedText: "", text: line.text.trim()
+                            }));
+                            const blocks = OCRStrategy.groupOcrData(rawOcrData, 18);
+                            const blockTexts = blocks.map(b => b.originalText.replace(/<br>/gi, "[[BR]]"));
+                            const translationPromises = blockTexts.map((text, i) => (async () => {
+                                try {
+                                    await ImmUtils.checkPaused();
+                                    const translation = await translator.translateText(text);
+                                    blocks[i].translatedText = ImmUtils.decodeHTMLEntities(translation.trim()).replace(/\[\[BR\]\]/g, "<br>");
+                                } catch (e) {
+                                    blocks[i].translatedText = "[[ERROR]]";
+                                }
+                            })());
+                            await Promise.all(translationPromises);
+                            if (ImmUtils.isCancelled()) return;
+                            pageContainers[idx]._translationCache = { blocks: blocks };
+                            if ("rendered" === pageContainers[idx].dataset.pageState || "translated" === pageContainers[idx].dataset.pageState) {
+                                this.uiManager._applyCachedTranslation(pageContainers[idx]);
+                            }
+                        }
+                    } else {
+                        const ocrContainer = pageContainers[idx];
+                        if ("placeholder" === ocrContainer.dataset.pageState) {
+                            this.uiManager._renderingPages.add(pageNum);
+                            try {
+                                await ProcessPdfPageFacede.renderPage(pdfDoc, pageNum, ocrContainer);
+                            } finally {
+                                this.uiManager._renderingPages.delete(pageNum);
+                            }
+                        }
+                        if (!ImmUtils.isCancelled() && ("rendered" === ocrContainer.dataset.pageState || "translated" === ocrContainer.dataset.pageState)) {
+                            const canvas = ocrContainer.querySelector("canvas");
+                            if (canvas) {
+                                this.uiManager._renderingPages.add(pageNum);
+                                try {
+                                    await this.ocrManager.processContent(canvas);
+                                    ocrContainer.dataset.pageState = "translated";
+                                } catch (error) {
+                                    console.error(`OCR error on page ${pageNum}:`, error);
+                                } finally {
+                                    this.uiManager._renderingPages.delete(pageNum);
+                                    this.uiManager._enforceMaxRendered();
+                                }
+                            }
+                        }
+                    }
+                    page.cleanup();
+                    processed++;
+                    this.uiManager.updateFeedback(`(${processed}/${totalPages})`);
+                    await ImmUtils.yieldControl();
+                };
+                for (const idx of translationOrder) {
+                    if (ImmUtils.isCancelled()) break;
+                    await translatePage(idx);
+                }
+                await this.ocrManager.getOcrEngine().terminateEngine();
+                this.uiManager.updateFeedback("Done!", !1);
             } catch (e) {
                 BaseUIManager.showNotification(`${e}`, "error");
             }
         }
         async stop(delay = 0) {
             this.uiManager.removeUI(delay);
+            if (ImmUtils.isCancelled()) return void this.translationService.stopWorker();
             let hasError = !0;
             for (;hasError; ) {
                 hasError = !1;
                 document.querySelectorAll(".ocr-box").forEach(box => {
-                    "[[ERROR]]" === JSON.parse(box.getAttribute("data-ocr-info")).translatedText && (hasError = !0);
+                    const info = box.getAttribute("data-ocr-info");
+                    if (!info) return;
+                    try { "[[ERROR]]" === JSON.parse(info).translatedText && (hasError = !0); } catch(e) {}
                 }), await new Promise(resolve => setTimeout(resolve, 5e3));
             }
             this.translationService.stopWorker();
