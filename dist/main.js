@@ -1664,167 +1664,136 @@
         }
         static groupOcrData(ocrData, eps = 20, minPts = 2) {
             if (!ocrData || !Array.isArray(ocrData) || 0 === ocrData.length) return [];
-            function computeBoxFeatures(item) {
-                const {x0: x0, y0: y0, x1: x1, y1: y1} = item.bbox, xCenter = (x0 + x1) / 2, yCenter = (y0 + y1) / 2, width = x1 - x0, height = y1 - y0;
-                let angle = 0;
-                return item.baseline && void 0 !== item.baseline.x0 && void 0 !== item.baseline.y0 && void 0 !== item.baseline.x1 && void 0 !== item.baseline.y1 && (angle = Math.atan2(item.baseline.y1 - item.baseline.y0, item.baseline.x1 - item.baseline.x0) * (180 / Math.PI)), 
-                {
-                    xCenter: xCenter,
-                    yCenter: yCenter,
-                    width: width,
-                    height: height,
-                    angle: angle
-                };
+            function med(arr) {
+                const s = arr.slice().sort((a, b) => a - b), m = Math.floor(s.length / 2);
+                return s.length % 2 === 0 ? (s[m - 1] + s[m]) / 2 : s[m];
             }
-            const boxes = ocrData.map(item => ({
-                item: item,
-                features: computeBoxFeatures(item)
-            }));
-            let totalWidth = 0, totalHeight = 0;
-            function frontierPoints(bbox, direction) {
-                const {x0: x0, y0: y0, x1: x1, y1: y1} = bbox;
-                switch (direction) {
-                  case "right":
-                    return [ {
-                        x: x1,
-                        y: y0
-                    }, {
-                        x: x1,
-                        y: (y0 + y1) / 2
-                    }, {
-                        x: x1,
-                        y: y1
-                    } ];
-
-                  case "left":
-                    return [ {
-                        x: x0,
-                        y: y0
-                    }, {
-                        x: x0,
-                        y: (y0 + y1) / 2
-                    }, {
-                        x: x0,
-                        y: y1
-                    } ];
-
-                  case "top":
-                    return [ {
-                        x: x0,
-                        y: y0
-                    }, {
-                        x: (x0 + x1) / 2,
-                        y: y0
-                    }, {
-                        x: x1,
-                        y: y0
-                    } ];
-
-                  case "bottom":
-                    return [ {
-                        x: x0,
-                        y: y1
-                    }, {
-                        x: (x0 + x1) / 2,
-                        y: y1
-                    }, {
-                        x: x1,
-                        y: y1
-                    } ];
-
-                  default:
-                    return [ {
-                        x: x0,
-                        y: y0
-                    }, {
-                        x: x1,
-                        y: y0
-                    }, {
-                        x: x1,
-                        y: y1
-                    }, {
-                        x: x0,
-                        y: y1
-                    }, {
-                        x: (x0 + x1) / 2,
-                        y: y0
-                    }, {
-                        x: x1,
-                        y: (y0 + y1) / 2
-                    }, {
-                        x: (x0 + x1) / 2,
-                        y: y1
-                    }, {
-                        x: x0,
-                        y: (y0 + y1) / 2
-                    } ];
+            // === xycut_plus with Y-padding for text lines ===
+            const N = ocrData.length;
+            const allH = ocrData.map(d => d.bbox.y1 - d.bbox.y0);
+            const medianH = med(allH) || 1;
+            const yPad = Math.ceil(medianH * 0.25);
+            // Flat int arrays: [x0,y0,x1,y1] per box. bx=raw, by=Y-padded
+            const bx = new Int32Array(N * 4), by = new Int32Array(N * 4);
+            for (let i = 0; i < N; i++) {
+                const b = ocrData[i].bbox, o = i * 4;
+                bx[o] = Math.floor(b.x0); bx[o+1] = Math.floor(b.y0);
+                bx[o+2] = Math.ceil(b.x1); bx[o+3] = Math.ceil(b.y1);
+                by[o] = bx[o]; by[o+1] = Math.max(0, bx[o+1] - yPad);
+                by[o+2] = bx[o+2]; by[o+3] = bx[o+3] + yPad;
+            }
+            // Projection histogram along axis (0=X, 1=Y)
+            function proj(indices, arr, axis) {
+                let mx = 0;
+                for (let i = 0; i < indices.length; i++) {
+                    const e = arr[indices[i] * 4 + (axis === 0 ? 2 : 3)];
+                    if (e > mx) mx = e;
                 }
-            }
-            function boxDistance(b1, b2) {
-                const bbox1 = b1.item.bbox, bbox2 = b2.item.bbox, points1 = frontierPoints(bbox1), points2 = frontierPoints(bbox2);
-                let minDistance = 1 / 0;
-                for (let i = 0; i < points1.length; i++) for (let j = 0; j < points2.length; j++) {
-                    const dx = points1[i].x - points2[j].x, dy = points1[i].y - points2[j].y, dist = Math.sqrt(dx * dx + dy * dy);
-                    dist < minDistance && (minDistance = dist);
+                if (mx <= 0) return null;
+                const h = new Int32Array(mx + 1);
+                for (let i = 0; i < indices.length; i++) {
+                    const o = indices[i] * 4;
+                    const s = arr[o + (axis === 0 ? 0 : 1)], e = arr[o + (axis === 0 ? 2 : 3)];
+                    for (let p = s; p < e; p++) h[p]++;
                 }
-                const angle1 = b1.features.angle, angle2 = b2.features.angle;
-                let angleDiff = Math.abs(angle1 - angle2);
-                return angleDiff > 90 && (angleDiff = 180 - angleDiff), minDistance + angleDiff;
+                return h;
             }
-            boxes.forEach(b => {
-                totalWidth += b.features.width, totalHeight += b.features.height;
-            });
-            const clusters = [], visited = new Array(boxes.length).fill(!1), assigned = new Array(boxes.length).fill(!1), noise = [];
-            function regionQuery(idx) {
-                const neighbors = [];
-                for (let j = 0; j < boxes.length; j++) j !== idx && boxDistance(boxes[idx], boxes[j]) <= eps && neighbors.push(j);
-                return neighbors;
+            // Split profile at valleys > minGap
+            function splitProf(h, minGap) {
+                if (!h) return null;
+                const a = [];
+                for (let i = 0; i < h.length; i++) if (h[i] > 0) a.push(i);
+                if (a.length === 0) return null;
+                const starts = [a[0]], ends = [];
+                for (let i = 1; i < a.length; i++) {
+                    if (a[i] - a[i - 1] > minGap) { ends.push(a[i - 1] + 1); starts.push(a[i]); }
+                }
+                ends.push(a[a.length - 1] + 1);
+                return { s: starts, e: ends };
             }
-            function expandCluster(idx, neighbors, cluster) {
-                cluster.push(idx), assigned[idx] = !0;
-                let queue = [ ...neighbors ];
-                for (;queue.length > 0; ) {
-                    const current = queue.shift();
-                    if (!visited[current]) {
-                        visited[current] = !0;
-                        const currentNeighbors = regionQuery(current);
-                        currentNeighbors.length >= minPts && (queue = queue.concat(currentNeighbors));
+            // Filter indices by interval on axis
+            function filt(indices, arr, axis, s, e) {
+                const r = [];
+                for (let i = 0; i < indices.length; i++) {
+                    const v = arr[indices[i] * 4 + (axis === 0 ? 0 : 1)];
+                    if (v >= s && v < e) r.push(indices[i]);
+                }
+                return r;
+            }
+            // Sort indices by axis
+            function srt(indices, arr, axis) {
+                const off = axis === 0 ? 0 : 1;
+                return indices.slice().sort((a, b) => arr[a * 4 + off] - arr[b * 4 + off]);
+            }
+            // recursive_yx_cut: Y first (padded), then X (raw) — for vertical text
+            function recYX(indices, res, mg) {
+                if (indices.length === 0) return;
+                const ys = srt(indices, by, 1);
+                const yp = splitProf(proj(ys, by, 1), 1);
+                if (!yp) return;
+                for (let r = 0; r < yp.s.length; r++) {
+                    const yc = filt(ys, by, 1, yp.s[r], yp.e[r]);
+                    if (yc.length === 0) continue;
+                    const xs = srt(yc, bx, 0);
+                    const xp = splitProf(proj(xs, bx, 0), mg);
+                    if (!xp) continue;
+                    if (xp.s.length <= 1) { res.push(xs); continue; }
+                    for (let c = 0; c < xp.s.length; c++) {
+                        const xc = filt(xs, bx, 0, xp.s[c], xp.e[c]);
+                        if (xc.length > 0) recYX(xc, res, mg);
                     }
-                    assigned[current] || (cluster.push(current), assigned[current] = !0);
                 }
             }
-            for (let i = 0; i < boxes.length; i++) {
-                if (visited[i]) continue;
-                visited[i] = !0;
-                const neighbors = regionQuery(i);
-                if (neighbors.length < minPts) noise.push(i); else {
-                    const cluster = [];
-                    expandCluster(i, neighbors, cluster), clusters.push(cluster);
+            // recursive_xy_cut: X first (raw), then Y (padded) — for horizontal text
+            function recXY(indices, res, mg) {
+                if (indices.length === 0) return;
+                const xs = srt(indices, bx, 0);
+                const xp = splitProf(proj(xs, bx, 0), 1);
+                if (!xp) return;
+                for (let c = 0; c < xp.s.length; c++) {
+                    const xc = filt(xs, bx, 0, xp.s[c], xp.e[c]);
+                    if (xc.length === 0) continue;
+                    const ys = srt(xc, by, 1);
+                    const yp = splitProf(proj(ys, by, 1), mg);
+                    if (!yp) continue;
+                    if (yp.s.length <= 1) { res.push(ys); continue; }
+                    for (let r = 0; r < yp.s.length; r++) {
+                        const yc = filt(ys, by, 1, yp.s[r], yp.e[r]);
+                        if (yc.length > 0) recXY(yc, res, mg);
+                    }
                 }
             }
-            function median(arr) {
-                const sorted = arr.slice().sort((a, b) => a - b), mid = Math.floor(sorted.length / 2);
-                return sorted.length % 2 == 0 ? (sorted[mid - 1] + sorted[mid]) / 2 : sorted[mid];
+            // Separate vertical-baseline boxes from horizontal ones
+            function isVerticalBox(idx) {
+                const d = ocrData[idx];
+                if (!d.baseline || void 0 === d.baseline.x0 || void 0 === d.baseline.y0 || void 0 === d.baseline.x1 || void 0 === d.baseline.y1) return !1;
+                const dx = d.baseline.x1 - d.baseline.x0, dy = d.baseline.y1 - d.baseline.y0;
+                const len = Math.sqrt(dx * dx + dy * dy);
+                if (len < 1) return !1;
+                return Math.abs(dx) < len * Math.cos(80 * Math.PI / 180);
             }
-            noise.filter(i => !assigned[i]).forEach(i => {
-                clusters.push([ i ]);
-            });
-            return clusters.map(clusterIndices => {
-                const clusterItems = clusterIndices.map(i => boxes[i].item);
-                clusterItems.sort((a, b) => a.bbox.y0 !== b.bbox.y0 ? a.bbox.y0 - b.bbox.y0 : a.bbox.x0 - b.bbox.x0);
-                const x0 = Math.min(...clusterItems.map(item => item.bbox.x0)), y0 = Math.min(...clusterItems.map(item => item.bbox.y0)), x1 = Math.max(...clusterItems.map(item => item.bbox.x1)), y1 = Math.max(...clusterItems.map(item => item.bbox.y1)), aggregatedText = clusterItems.map(item => item.text).join(" "), baselines = clusterItems.map(item => item.baseline).filter(b => b);
+            const hIdx = [], vIdx = [];
+            for (let i = 0; i < N; i++) (isVerticalBox(i) ? vIdx : hIdx).push(i);
+            const clusters = [];
+            // Process horizontal text with X-first cut
+            if (hIdx.length > 0) recXY(hIdx, clusters, 1);
+            // Process vertical text with Y-first cut (each separately)
+            if (vIdx.length > 0) recYX(vIdx, clusters, 1);
+            // Fallback
+            const assigned = new Set();
+            for (let i = 0; i < clusters.length; i++) for (let j = 0; j < clusters[i].length; j++) assigned.add(clusters[i][j]);
+            for (let i = 0; i < N; i++) if (!assigned.has(i)) clusters.push([i]);
+            return clusters.filter(c => c.length > 0).map(clusterIndices => {
+                const items = clusterIndices.map(i => ocrData[i]);
+                items.sort((a, b) => a.bbox.y0 !== b.bbox.y0 ? a.bbox.y0 - b.bbox.y0 : a.bbox.x0 - b.bbox.x0);
+                const x0 = Math.min(...items.map(d => d.bbox.x0)), y0 = Math.min(...items.map(d => d.bbox.y0)), x1 = Math.max(...items.map(d => d.bbox.x1)), y1 = Math.max(...items.map(d => d.bbox.y1)), aggregatedText = items.map(d => d.text).join(" "), baselines = items.map(d => d.baseline).filter(b => b);
                 return {
-                    bbox: {
-                        x0: x0,
-                        y0: y0,
-                        x1: x1,
-                        y1: y1
-                    },
+                    bbox: { x0: x0, y0: y0, x1: x1, y1: y1 },
                     baseline: {
-                        x0: median(baselines.map(b => b.x0)),
-                        y0: median(baselines.map(b => b.y0)),
-                        x1: median(baselines.map(b => b.x1)),
-                        y1: median(baselines.map(b => b.y1))
+                        x0: med(baselines.map(b => b.x0)),
+                        y0: med(baselines.map(b => b.y0)),
+                        x1: med(baselines.map(b => b.x1)),
+                        y1: med(baselines.map(b => b.y1))
                     },
                     originalText: aggregatedText,
                     translatedText: ""
