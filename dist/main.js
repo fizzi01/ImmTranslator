@@ -1698,11 +1698,19 @@
                 }
                 return h;
             }
-            // Split profile at valleys > minGap
-            function splitProf(h, minGap) {
+            // Split profile at valleys — uses adaptive density threshold
+            // minGap: minimum width of a valley to count as a split
+            // densityRatio: a valley pixel counts as "empty" if value <= peak * densityRatio
+            function splitProf(h, minGap, densityRatio) {
                 if (!h) return null;
+                const dr = densityRatio || 0;
+                // Find peak density
+                let peak = 0;
+                for (let i = 0; i < h.length; i++) if (h[i] > peak) peak = h[i];
+                const threshold = Math.floor(peak * dr);
+                // Collect all "active" indices (above threshold)
                 const a = [];
-                for (let i = 0; i < h.length; i++) if (h[i] > 0) a.push(i);
+                for (let i = 0; i < h.length; i++) if (h[i] > threshold) a.push(i);
                 if (a.length === 0) return null;
                 const starts = [a[0]], ends = [];
                 for (let i = 1; i < a.length; i++) {
@@ -1726,59 +1734,82 @@
                 return indices.slice().sort((a, b) => arr[a * 4 + off] - arr[b * 4 + off]);
             }
             // recursive_yx_cut: Y first (padded), then X (raw) — for vertical text
-            function recYX(indices, res, mg) {
+            function recYX(indices, res, mg, depth) {
                 if (indices.length === 0) return;
+                depth = depth || 0;
                 const ys = srt(indices, by, 1);
-                const yp = splitProf(proj(ys, by, 1), 1);
+                const yp = splitProf(proj(ys, by, 1), 1, 0);
                 if (!yp) return;
                 for (let r = 0; r < yp.s.length; r++) {
                     const yc = filt(ys, by, 1, yp.s[r], yp.e[r]);
                     if (yc.length === 0) continue;
                     const xs = srt(yc, bx, 0);
-                    const xp = splitProf(proj(xs, bx, 0), mg);
+                    // X-axis: try strict first, then density-aware for column detection
+                    let xp = splitProf(proj(xs, bx, 0), mg, 0);
+                    if ((!xp || xp.s.length <= 1) && depth === 0 && yc.length > 8) {
+                        xp = splitProf(proj(xs, bx, 0), Math.max(1, Math.ceil(medianH * 0.5)), 0.1);
+                    }
                     if (!xp) continue;
                     if (xp.s.length <= 1) { res.push(xs); continue; }
                     for (let c = 0; c < xp.s.length; c++) {
                         const xc = filt(xs, bx, 0, xp.s[c], xp.e[c]);
-                        if (xc.length > 0) recYX(xc, res, mg);
+                        if (xc.length > 0) recYX(xc, res, mg, depth + 1);
                     }
                 }
             }
             // recursive_xy_cut: X first (raw), then Y (padded) — for horizontal text
-            function recXY(indices, res, mg) {
+            // Uses density-aware splitting on X-axis to detect columns even when
+            // a few elements (formulas, footnotes) span the column gap.
+            function recXY(indices, res, mg, depth) {
                 if (indices.length === 0) return;
+                depth = depth || 0;
                 const xs = srt(indices, bx, 0);
-                const xp = splitProf(proj(xs, bx, 0), 1);
+                // On X-axis: try strict (0), then density-aware (0.1) to catch columns
+                // bridged by sparse elements like formulas
+                let xp = splitProf(proj(xs, bx, 0), 1, 0);
+                if ((!xp || xp.s.length <= 1) && depth === 0 && indices.length > 8) {
+                    xp = splitProf(proj(xs, bx, 0), Math.max(1, Math.ceil(medianH * 0.5)), 0.1);
+                }
                 if (!xp) return;
                 for (let c = 0; c < xp.s.length; c++) {
                     const xc = filt(xs, bx, 0, xp.s[c], xp.e[c]);
                     if (xc.length === 0) continue;
                     const ys = srt(xc, by, 1);
-                    const yp = splitProf(proj(ys, by, 1), mg);
+                    // Y-axis: strict density (0) — lines within a column are dense
+                    const yp = splitProf(proj(ys, by, 1), mg, 0);
                     if (!yp) continue;
                     if (yp.s.length <= 1) { res.push(ys); continue; }
                     for (let r = 0; r < yp.s.length; r++) {
                         const yc = filt(ys, by, 1, yp.s[r], yp.e[r]);
-                        if (yc.length > 0) recXY(yc, res, mg);
+                        if (yc.length > 0) recXY(yc, res, mg, depth + 1);
                     }
                 }
             }
-            // Separate vertical-baseline boxes from horizontal ones
-            function isVerticalBox(idx) {
+            // Group boxes by baseline angle — prevents mixing orientations in XY-cut
+            function getAngle(idx) {
                 const d = ocrData[idx];
-                if (!d.baseline || void 0 === d.baseline.x0 || void 0 === d.baseline.y0 || void 0 === d.baseline.x1 || void 0 === d.baseline.y1) return !1;
+                if (!d.baseline || void 0 === d.baseline.x0 || void 0 === d.baseline.y0 || void 0 === d.baseline.x1 || void 0 === d.baseline.y1) return 0;
                 const dx = d.baseline.x1 - d.baseline.x0, dy = d.baseline.y1 - d.baseline.y0;
-                const len = Math.sqrt(dx * dx + dy * dy);
-                if (len < 1) return !1;
-                return Math.abs(dx) < len * Math.cos(80 * Math.PI / 180);
+                if (Math.sqrt(dx * dx + dy * dy) < 1) return 0;
+                let a = Math.atan2(dy, dx) * (180 / Math.PI);
+                if (a > 90) a -= 180; if (a < -90) a += 180;
+                return a;
             }
-            const hIdx = [], vIdx = [];
-            for (let i = 0; i < N; i++) (isVerticalBox(i) ? vIdx : hIdx).push(i);
+            const ANG_T = 8; // degrees tolerance for same-angle bucket
+            const angGroups = new Map();
+            for (let i = 0; i < N; i++) {
+                const a = getAngle(i);
+                const bucket = Math.abs(a) <= ANG_T ? 0 : Math.abs(a) >= 90 - ANG_T ? 90 : Math.round(a / ANG_T) * ANG_T;
+                if (!angGroups.has(bucket)) angGroups.set(bucket, []);
+                angGroups.get(bucket).push(i);
+            }
             const clusters = [];
-            // Process horizontal text with X-first cut
-            if (hIdx.length > 0) recXY(hIdx, clusters, 1);
-            // Process vertical text with Y-first cut (each separately)
-            if (vIdx.length > 0) recYX(vIdx, clusters, 1);
+            for (const [bucket, idxs] of angGroups) {
+                if (idxs.length === 0) continue;
+                if (bucket === 0) recXY(idxs, clusters, 1);            // horizontal -> X-first
+                else if (Math.abs(bucket) >= 90 - ANG_T) recYX(idxs, clusters, 1); // vertical -> Y-first
+                else recYX(idxs, clusters, 1);                          // angled -> Y-first (no columns expected)
+            }
             // Fallback
             const assigned = new Set();
             for (let i = 0; i < clusters.length; i++) for (let j = 0; j < clusters[i].length; j++) assigned.add(clusters[i][j]);
@@ -1799,6 +1830,88 @@
                     translatedText: ""
                 };
             });
+        }
+        static debugXYCut(ocrData, containerEl) {
+            if (!ocrData || !ocrData.length) { console.log("No ocrData to debug"); return; }
+            const colors = ["#e6194b","#3cb44b","#ffe119","#4363d8","#f58231","#911eb4","#42d4f4","#f032e6","#bfef45","#fabebe","#469990","#e6beff","#9A6324","#800000","#aaffc3","#808000","#ffd8b1","#000075","#a9a9a9","#00ff80","#ff69b4","#7b68ee"];
+            // Run groupOcrData to get clusters
+            const result = OCRStrategy.groupOcrData(ocrData);
+            console.group("%c[XY-Cut Debug] " + result.length + " clusters from " + ocrData.length + " boxes", "font-weight:bold;font-size:14px");
+            // Log raw input boxes
+            console.log("Input boxes:", ocrData.map((d, i) => ({
+                i: i, text: d.text.substring(0, 40), x0: Math.round(d.bbox.x0), y0: Math.round(d.bbox.y0), x1: Math.round(d.bbox.x1), y1: Math.round(d.bbox.y1)
+            })));
+            // Log each cluster
+            result.forEach((cl, ci) => {
+                const c = colors[ci % colors.length];
+                const txt = cl.originalText.substring(0, 80);
+                console.log("%cCluster " + ci + " (" + txt + "...)", "color:" + c + ";font-weight:bold",
+                    "\n  bbox:", JSON.stringify(cl.bbox),
+                    "\n  items:", cl.originalText.split(" ").length + " words");
+            });
+            // Draw visual overlay
+            if (containerEl) {
+                containerEl.querySelectorAll(".xycut-debug-overlay").forEach(e => e.remove());
+                const canvas = containerEl.querySelector("canvas") || containerEl.querySelector("img");
+                if (canvas) {
+                    const baseW = canvas.ocrBaseWidth || canvas.width || canvas.naturalWidth;
+                    const baseH = canvas.ocrBaseHeight || canvas.height || canvas.naturalHeight;
+                    const rect = canvas.getBoundingClientRect();
+                    const cRect = containerEl.getBoundingClientRect();
+                    const sx = rect.width / baseW, sy = rect.height / baseH;
+                    const ox = rect.left - cRect.left, oy = rect.top - cRect.top;
+                    result.forEach((cl, ci) => {
+                        const c = colors[ci % colors.length];
+                        const div = document.createElement("div");
+                        div.className = "xycut-debug-overlay";
+                        div.style.cssText = "position:absolute;pointer-events:none;z-index:99999;border:2px solid " + c + ";background:" + c + "22;";
+                        div.style.left = (ox + cl.bbox.x0 * sx) + "px";
+                        div.style.top = (oy + cl.bbox.y0 * sy) + "px";
+                        div.style.width = ((cl.bbox.x1 - cl.bbox.x0) * sx) + "px";
+                        div.style.height = ((cl.bbox.y1 - cl.bbox.y0) * sy) + "px";
+                        const label = document.createElement("span");
+                        label.style.cssText = "position:absolute;top:-16px;left:0;font-size:11px;color:" + c + ";font-weight:bold;font-family:monospace;text-shadow:0 0 3px #000,0 0 3px #000;";
+                        label.textContent = "#" + ci;
+                        div.appendChild(label);
+                        containerEl.appendChild(div);
+                    });
+                    console.log("%cOverlays drawn on container. Call window.__xycutDebugClear() to remove.", "color:gray;font-style:italic");
+                }
+            }
+            // Log X projection for detecting column issues
+            const allH = ocrData.map(d => d.bbox.y1 - d.bbox.y0);
+            const mH = allH.slice().sort((a,b)=>a-b); const medH = mH[Math.floor(mH.length/2)] || 1;
+            console.log("medianH:", Math.round(medH), "yPad:", Math.ceil(medH * 0.25));
+            const maxX = Math.ceil(Math.max(...ocrData.map(d => d.bbox.x1)));
+            const xProj = new Int32Array(maxX + 1);
+            ocrData.forEach(d => { for (let p = Math.floor(d.bbox.x0); p < Math.ceil(d.bbox.x1); p++) xProj[p]++; });
+            // Find X valleys (zeros)
+            const xValleys = [];
+            let inValley = false, vs = 0;
+            for (let i = 0; i <= maxX; i++) {
+                if (xProj[i] === 0 && !inValley) { inValley = true; vs = i; }
+                else if (xProj[i] > 0 && inValley) { inValley = false; if (i - vs > 1) xValleys.push({ start: vs, end: i, width: i - vs }); }
+            }
+            if (xValleys.length > 0) {
+                console.log("X-axis valleys (potential column gaps):", xValleys.sort((a, b) => b.width - a.width).slice(0, 10));
+            } else {
+                console.log("%cNo X-axis valleys found — boxes overlap horizontally everywhere.", "color:red;font-weight:bold");
+                // Find near-zero regions with density-aware threshold
+                let peak = 0;
+                for (let i = 0; i <= maxX; i++) if (xProj[i] > peak) peak = xProj[i];
+                const dThreshold = Math.floor(peak * 0.1);
+                console.log("X-projection peak:", peak, "density threshold (10%):", dThreshold);
+                const nearValleys = [];
+                let inNear = false, ns = 0;
+                for (let i = 0; i <= maxX; i++) {
+                    if (xProj[i] <= dThreshold && !inNear) { inNear = true; ns = i; }
+                    else if (xProj[i] > dThreshold && inNear) { inNear = false; if (i - ns > medH * 0.5) nearValleys.push({ start: ns, end: i, width: i - ns, maxDensity: Math.max(...Array.from(xProj.slice(ns, i))) }); }
+                }
+                if (nearValleys.length) console.log("Density-aware valleys (10% threshold):", nearValleys.sort((a, b) => b.width - a.width).slice(0, 10));
+                else console.log("%cNo density valleys found either — truly single-column layout", "color:orange");
+            }
+            console.groupEnd();
+            return result;
         }
         static debounce(func, wait) {
             let timeout;
@@ -2703,6 +2816,33 @@
         legacyStart: async (type, download, pdfOCR, options) => await start(type, download, pdfOCR, options)
     };
     const namespace = "undefined" != typeof window ? window : "undefined" != typeof self ? self : globalThis;
-    namespace.immTrans = namespace.immTrans || {}, namespace.immTrans.start = start, 
+    namespace.immTrans = namespace.immTrans || {}, namespace.immTrans.start = start,
     namespace.immTrans.resetAll = resetAll;
+    // Debug helpers — call from browser console
+    window.__xycutDebug = function(pageIndex) {
+        const containers = document.querySelectorAll(".ocr-container");
+        const idx = pageIndex || 0;
+        const container = containers[idx];
+        if (!container) { console.log("No container at index", idx, "— total:", containers.length); return; }
+        const canvas = container.querySelector("canvas") || container.querySelector("img");
+        if (!canvas) { console.log("No canvas/img in container", idx); return; }
+        // Rebuild ocrData from existing boxes or pdfTextContent
+        let ocrData = null;
+        if (canvas.pdfTextContent) {
+            const r = PdfPageOCRStrategy.mapPdfTextToOcrResult(canvas.pdfTextContent.text, canvas.pdfTextContent.viewport);
+            ocrData = r.data.lines.filter(l => l.text.trim()).map(l => ({ bbox: l.bbox, baseline: l.baseline, text: l.text.trim() }));
+        }
+        if (!ocrData) {
+            const boxes = container.querySelectorAll(".ocr-box");
+            if (boxes.length) {
+                ocrData = Array.from(boxes).map(b => { try { return JSON.parse(b.getAttribute("data-ocr-info")); } catch(e) { return null; } }).filter(Boolean);
+            }
+        }
+        if (!ocrData || !ocrData.length) { console.log("No OCR data available for page", idx); return; }
+        return OCRStrategy.debugXYCut(ocrData, container);
+    };
+    window.__xycutDebugClear = function() {
+        document.querySelectorAll(".xycut-debug-overlay").forEach(e => e.remove());
+        console.log("Debug overlays cleared.");
+    };
 }();
