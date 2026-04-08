@@ -437,14 +437,96 @@
             type: "ready"
         });
     }
-    const codeStr = workerCore.toString(), workerBody = codeStr.substring(codeStr.indexOf("{") + 1, codeStr.lastIndexOf("}")), blob = new Blob([ workerBody ], {
-        type: "text/javascript"
-    }), blobUrl = URL.createObjectURL(blob), namespace = "undefined" != typeof window ? window : "undefined" != typeof self ? self : globalThis;
-    namespace.immTrans = namespace.immTrans || {}, namespace.immTrans.worker = new Worker(blobUrl), 
-    namespace.immTrans.workerCore = workerCore, namespace.immTrans.ready = new Promise(resolve => {
-        namespace.immTrans.worker.addEventListener("message", function handle(e) {
-            "ready" === e.data?.type && (namespace.immTrans.worker.removeEventListener("message", handle), 
-            resolve());
-        });
+    const codeStr = workerCore.toString(), workerBody = codeStr.substring(codeStr.indexOf("{") + 1, codeStr.lastIndexOf("}")),
+    namespace = "undefined" != typeof window ? window : "undefined" != typeof self ? self : globalThis;
+    namespace.immTrans = namespace.immTrans || {};
+    namespace.immTrans.workerCore = workerCore;
+    function createMainThreadShim() {
+        // workerPort = "inside worker" (fakeSelf), callerPort = "outside" (returned to app)
+        const channel = new MessageChannel();
+        const workerPort = channel.port1, callerPort = channel.port2;
+        const fakeSelf = {
+            onmessage: null,
+            postMessage: function(data) { workerPort.postMessage(data); },
+            addEventListener: function() {},
+            removeEventListener: function() {}
+        };
+        // Messages from caller -> workerPort -> fakeSelf.onmessage (workerCore handler)
+        workerPort.onmessage = function(e) {
+            if (typeof fakeSelf.onmessage === "function") fakeSelf.onmessage(e);
+        };
+        workerPort.start(); callerPort.start();
+        try {
+            const fn = new Function("self", "postMessage", workerBody);
+            fn(fakeSelf, fakeSelf.postMessage);
+        } catch(err) {}
+        return {
+            postMessage: function(data) { callerPort.postMessage(data); },
+            addEventListener: function(type, fn) {
+                if (type === "message") callerPort.addEventListener("message", fn);
+            },
+            removeEventListener: function(type, fn) {
+                if (type === "message") callerPort.removeEventListener("message", fn);
+            },
+            terminate: function() { workerPort.close(); callerPort.close(); }
+        };
+    }
+    // Try real Worker first; if CSP blocks it, fall back to main-thread shim
+    namespace.immTrans.ready = new Promise(resolve => {
+        let settled = false;
+        function useShim() {
+            console.warn("Skipping worker!");
+            if (settled) return;
+            settled = true;
+            const shim = createMainThreadShim();
+            namespace.immTrans.worker = shim;
+            // Shim emits "ready" synchronously before listener, so use setTimeout
+            shim.addEventListener("message", function handle(e) {
+                if ("ready" === e.data?.type) { shim.removeEventListener("message", handle); resolve(); }
+            });
+            setTimeout(resolve, 100);
+        }
+        try {
+            const blob = new Blob([ workerBody ], { type: "text/javascript" });
+            const blobUrl = URL.createObjectURL(blob);
+            // Listen for CSP violation before creating the Worker
+            const onViolation = function(e) {
+                if (e.violatedDirective && e.violatedDirective.startsWith("worker-src")) {
+                    document.removeEventListener("securitypolicyviolation", onViolation);
+                    useShim();
+                }
+            };
+            document.addEventListener("securitypolicyviolation", onViolation);
+            const realWorker = new Worker(blobUrl);
+            // If Worker is created, wait for "ready" message with timeout
+            const timeout = setTimeout(function() {
+                // Timed out — Worker was created but never responded (CSP may have silently blocked)
+                document.removeEventListener("securitypolicyviolation", onViolation);
+                try { realWorker.terminate(); } catch(e) {}
+                useShim();
+            }, 2000);
+            realWorker.addEventListener("message", function handle(e) {
+                console.log("Using worker");
+                if ("ready" === e.data?.type) {
+                    clearTimeout(timeout);
+                    document.removeEventListener("securitypolicyviolation", onViolation);
+                    if (!settled) {
+                        settled = true;
+                        namespace.immTrans.worker = realWorker;
+                        realWorker.removeEventListener("message", handle);
+                        resolve();
+                    }
+                }
+            });
+            // Also handle Worker error event (some browsers fire this instead of CSP event)
+            realWorker.addEventListener("error", function() {
+                clearTimeout(timeout);
+                document.removeEventListener("securitypolicyviolation", onViolation);
+                try { realWorker.terminate(); } catch(e) {}
+                useShim();
+            });
+        } catch(e) {
+            useShim();
+        }
     });
 }();
