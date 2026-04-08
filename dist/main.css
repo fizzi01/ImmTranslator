@@ -85,13 +85,35 @@
     --md-transition-easing-accelerate: cubic-bezier(0.4, 0.0, 1, 1);
 }
 
+
+/* ==========================================
+   ANIMATIONS
+   ========================================== */
+
 @keyframes spin {
-    0% {
-        transform: rotate(0deg);
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+@keyframes immTransl-slideUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px) scale(0.97);
     }
-    100% {
-        transform: rotate(360deg);
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
     }
+}
+
+@keyframes immTransl-fadeIn {
+    from { opacity: 0; transform: translateY(-6px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes immTransl-fadeOut {
+    from { opacity: 1; transform: scale(1); }
+    to { opacity: 0; transform: scale(0.96) translateY(8px); }
 }
 
 @keyframes md-fadein {
@@ -106,224 +128,30 @@
 }
 
 @keyframes md-fadeout {
-    from {
-        opacity: 1;
-        transform: scale(1);
-    }
-    to {
-        opacity: 0;
-        transform: scale(0.95);
-    }
+    from { opacity: 1; transform: scale(1); }
+    to { opacity: 0; transform: scale(0.95); }
 }
 
 @keyframes md-slide-up {
     from {
         opacity: 0;
-        transform: translateY(16px);
+        transform: translateY(16px) scale(0.95);
     }
     to {
         opacity: 1;
-        transform: translateY(0);
+        transform: translateY(0) scale(1);
     }
 }
 
-#translationContainer {
-    display: flex !important;
-    flex-direction: row !important;
-    align-items: center !important;
-    gap: 12px !important;
-    transition: transform var(--md-transition-duration-long) var(--md-transition-easing-standard) !important;
-    transform-origin: right !important;
-    font-family: var(--md-font-family) !important;
-}
 
-/* Mobile optimizations for main UI container */
-@media (max-width: 768px) {
-    #immersiveTranslatorUI {
-        bottom: 16px !important;
-        right: 16px !important;
-        gap: 10px !important;
-    }
-    
-    #translationContainer {
-        gap: 8px !important;
-        max-width: calc(100vw - 32px) !important;
-        flex-wrap: nowrap !important;
-    }
-    
-    #notificationContainer {
-        gap: 10px !important;
-        max-width: calc(100vw - 32px) !important;
-    }
-}
+/* ==========================================
+   MAIN UI CONTAINER - Fixed overlay
+   ========================================== */
 
-@media (max-width: 480px) {
-    #immersiveTranslatorUI {
-        bottom: 12px !important;
-        right: 12px !important;
-        gap: 8px !important;
-    }
-    
-    #translationContainer {
-        gap: 6px !important;
-        max-width: calc(100vw - 24px) !important;
-    }
-    
-    #notificationContainer {
-        gap: 8px !important;
-        max-width: calc(100vw - 24px) !important;
-    }
-}
-
-#translationContainer.hidden {
-    transform: translateX(calc(100% - 96px));
-}
-
-/* Mobile optimizations for hidden state */
-@media (max-width: 768px) {
-    #translationContainer.hidden {
-        transform: translateX(calc(100% - 96px));
-    }
-}
-
-@media (max-width: 480px) {
-    #translationContainer.hidden {
-        transform: translateX(calc(100% - 96px));
-    }
-}
-
-/* Main feedback box with Material Design principles */
-#translationFeedbackBox {
-    background: var(--md-surface-800) !important;
-    color: var(--md-surface-50) !important;
-    padding: 16px 24px !important;
-    border-radius: var(--md-border-radius-large) !important;
-    font-family: var(--md-font-family) !important;
-    font-size: 16px !important;
-    font-weight: var(--md-font-weight-regular) !important;
-    display: flex !important;
-    max-width: 90vw !important;
-    align-items: center !important;
-    box-shadow: var(--md-shadow-6) !important;
-    backdrop-filter: blur(8px) !important;
-    -webkit-backdrop-filter: blur(8px) !important;
-    transition: transform var(--md-transition-duration-long) var(--md-transition-easing-standard) !important;
-    transform-origin: right !important;
-    letter-spacing: 0.25px !important;
-    min-height: 56px !important;
-    word-wrap: break-word !important;
-    overflow-wrap: break-word !important;
-}
-
-/* Mobile optimizations for feedback box */
-@media (max-width: 768px) {
-    #translationFeedbackBox {
-        padding: 14px 20px !important;
-        font-size: 15px !important;
-        border-radius: var(--md-border-radius-medium) !important;
-        min-height: 52px !important;
-        max-width: calc(100vw - 120px) !important;
-    }
-}
-
-@media (max-width: 480px) {
-    #translationFeedbackBox {
-        padding: 12px 16px !important;
-        font-size: 14px !important;
-        min-height: 48px !important;
-        max-width: calc(100vw - 100px) !important;
-        line-height: 1.3 !important;
-    }
-}
-
-.immTransl-arrow {
-    width: 24px;
-    height: 24px;
-    cursor: pointer;
-    transition: transform var(--md-transition-duration-medium) var(--md-transition-easing-standard);
-    margin-right: 12px;
-    align-items: center;
-    display: flex;
-    color: var(--md-surface-300);
-    border-radius: 50%;
-    padding: 8px;
-    background: rgba(255, 255, 255, 0.08);
-    min-width: 40px;
-    min-height: 40px;
-    justify-content: center;
-    touch-action: manipulation;
-}
-
-.immTransl-arrow:hover {
-    background: rgba(255, 255, 255, 0.12);
-    color: var(--md-surface-50);
-}
-
-.immTransl-arrow:active {
-    background: rgba(255, 255, 255, 0.16);
-    transform: scale(0.95);
-}
-
-/* Mobile optimizations for arrow */
-@media (max-width: 768px) {
-    .immTransl-arrow {
-        width: 20px;
-        height: 20px;
-        min-width: 44px;
-        min-height: 44px;
-        padding: 12px;
-        margin-right: 8px;
-    }
-}
-
-@media (max-width: 480px) {
-    .immTransl-arrow {
-        width: 18px;
-        height: 18px;
-        min-width: 40px;
-        min-height: 40px;
-        padding: 11px;
-        margin-right: 6px;
-    }
-}
-
-#translationContainer.hidden .immTransl-arrow {
-    transform: rotate(180deg);
-}
-
-#translationFeedbackBox .spinner {
-    width: 20px !important;
-    height: 20px !important;
-    border: 2px solid var(--md-primary-200) !important;
-    border-top: 2px solid var(--md-primary-500) !important;
-    border-radius: 50% !important;
-    margin-right: 12px !important;
-    animation: spin 1s linear infinite;
-    flex-shrink: 0 !important;
-}
-
-/* Mobile optimizations for spinner */
-@media (max-width: 768px) {
-    #translationFeedbackBox .spinner {
-        width: 18px !important;
-        height: 18px !important;
-        margin-right: 10px !important;
-    }
-}
-
-@media (max-width: 480px) {
-    #translationFeedbackBox .spinner {
-        width: 16px !important;
-        height: 16px !important;
-        margin-right: 8px !important;
-    }
-}
-
-/* Main UI container with Material Design elevation */
 #immersiveTranslatorUI {
     position: fixed !important;
-    bottom: 20px !important;
-    right: 20px !important;
+    bottom: 24px !important;
+    right: 24px !important;
     z-index: 10000000 !important;
     display: flex !important;
     flex-direction: column !important;
@@ -337,11 +165,237 @@
     pointer-events: auto !important;
 }
 
-/* Notification container with Material Design elevation */
+
+/* ==========================================
+   TRANSLATION CONTAINER
+   ========================================== */
+
+#translationContainer {
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    gap: 10px !important;
+    transition: transform 400ms cubic-bezier(0.16, 1, 0.3, 1),
+                opacity 300ms ease,
+                gap 300ms ease !important;
+    transform-origin: right center !important;
+    font-family: var(--md-font-family) !important;
+    animation: immTransl-slideUp 500ms cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+/* ---- Minimized (pill) state ---- */
+
+#translationContainer.hidden {
+    gap: 0 !important;
+}
+
+#translationContainer.hidden #resetButton {
+    width: 0 !important;
+    height: 0 !important;
+    min-width: 0 !important;
+    min-height: 0 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    opacity: 0 !important;
+    overflow: hidden !important;
+    pointer-events: none !important;
+    border: none !important;
+    box-shadow: none !important;
+}
+
+#translationContainer.hidden #translationFeedbackBox {
+    padding: 6px 6px 6px 10px !important;
+    border-radius: 24px !important;
+    min-height: 36px !important;
+}
+
+#translationContainer.hidden #translationFeedbackBox::before {
+    opacity: 0 !important;
+}
+
+#translationContainer.hidden #feedbackText {
+    width: 0 !important;
+    max-width: 0 !important;
+    min-width: 0 !important;
+    flex: 0 0 0px !important;
+    opacity: 0 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    pointer-events: none !important;
+    overflow: hidden !important;
+}
+
+#translationContainer.hidden #translationControls {
+    width: 0 !important;
+    max-width: 0 !important;
+    min-width: 0 !important;
+    flex: 0 0 0px !important;
+    opacity: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border-color: transparent !important;
+    pointer-events: none !important;
+    overflow: hidden !important;
+}
+
+#translationContainer.hidden .immTransl-arrow {
+    transform: rotate(180deg);
+    margin-right: 0;
+    border-radius: 22px!important;
+}
+
+#translationContainer.hidden .spinner {
+    margin-right: 4px !important;
+    margin-left: 10px !important;
+}
+
+
+/* ==========================================
+   FEEDBACK BOX - Glassmorphism Card
+   ========================================== */
+
+#translationFeedbackBox {
+    position: relative !important;
+    background: rgba(12, 17, 29, 0.82) !important;
+    color: rgba(255, 255, 255, 0.92) !important;
+    padding: 12px 18px !important;
+    border-radius: 14px !important;
+    font-family: var(--md-font-family) !important;
+    font-size: 13.5px !important;
+    font-weight: var(--md-font-weight-regular) !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 0 !important;
+    box-shadow:
+        0 8px 32px rgba(0, 0, 0, 0.28),
+        0 2px 8px rgba(0, 0, 0, 0.15),
+        inset 0 1px 0 rgba(255, 255, 255, 0.06) !important;
+    backdrop-filter: blur(24px) saturate(1.4) !important;
+    -webkit-backdrop-filter: blur(24px) saturate(1.4) !important;
+    border: 1px solid rgba(255, 255, 255, 0.08) !important;
+    transition: transform 300ms cubic-bezier(0.16, 1, 0.3, 1),
+                box-shadow 300ms ease,
+                padding 300ms cubic-bezier(0.16, 1, 0.3, 1),
+                border-radius 300ms ease,
+                min-height 300ms ease,
+                background 400ms ease,
+                color 400ms ease,
+                border-color 400ms ease !important;
+    transform-origin: right center !important;
+    letter-spacing: 0.2px !important;
+    min-height: 48px !important;
+    max-width: 90vw !important;
+    overflow: hidden !important;
+    word-wrap: break-word !important;
+    overflow-wrap: break-word !important;
+}
+
+/* Gradient accent line at top */
+#translationFeedbackBox::before {
+    content: "" !important;
+    position: absolute !important;
+    top: 0 !important;
+    left: 16px !important;
+    right: 16px !important;
+    height: 2px !important;
+    background: linear-gradient(90deg,
+        var(--md-primary-400),
+        var(--md-primary-300),
+        var(--md-primary-500)) !important;
+    border-radius: 0 0 2px 2px !important;
+    opacity: 0.7 !important;
+}
+
+
+/* ==========================================
+   COLLAPSE / EXPAND ARROW
+   ========================================== */
+
+.immTransl-arrow {
+    width: 18px;
+    height: 18px;
+    cursor: pointer;
+    transition: transform 300ms cubic-bezier(0.16, 1, 0.3, 1),
+                background 200ms ease,
+                margin 300ms ease,
+                color 400ms ease;
+    margin-right: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: rgba(255, 255, 255, 0.5);
+    border-radius: 8px;
+    padding: 8px;
+    background: rgba(255, 255, 255, 0.04);
+    min-width: 34px;
+    min-height: 34px;
+    flex-shrink: 0;
+    touch-action: manipulation;
+}
+
+.immTransl-arrow:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: rgba(255, 255, 255, 0.85);
+}
+
+.immTransl-arrow:active {
+    background: rgba(255, 255, 255, 0.14);
+    transform: scale(0.92);
+}
+
+.immTransl-arrow svg {
+    width: 16px !important;
+    height: 16px !important;
+}
+
+
+/* ==========================================
+   SPINNER - Modern ring
+   ========================================== */
+
+#translationFeedbackBox .spinner {
+    width: 24px !important;
+    height: 24px !important;
+    border: 2.5px solid rgba(118, 200, 219, 0.2) !important;
+    border-top-color: var(--md-primary-300) !important;
+    border-radius: 50% !important;
+    margin-right: 12px !important;
+    animation: spin 0.8s cubic-bezier(0.45, 0.05, 0.55, 0.95) infinite !important;
+    flex-shrink: 0 !important;
+    transition: margin 300ms ease,
+                border-color 400ms ease !important;
+}
+
+
+/* ==========================================
+   FEEDBACK TEXT
+   ========================================== */
+
+#feedbackText {
+    flex: 1 1 auto !important;
+    min-width: 0 !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    font-size: 13.5px !important;
+    color: rgba(255, 255, 255, 0.85) !important;
+    letter-spacing: 0.15px !important;
+    line-height: 1.4 !important;
+    max-width: 500px !important;
+    transition: max-width 350ms cubic-bezier(0.16, 1, 0.3, 1),
+                opacity 250ms ease,
+                color 400ms ease !important;
+}
+
+
+/* ==========================================
+   NOTIFICATION CONTAINER
+   ========================================== */
+
 #notificationContainer {
     display: flex !important;
     flex-direction: column !important;
-    gap: 5px !important;
+    gap: 8px !important;
     max-width: 90vw !important;
     font-family: var(--md-font-family) !important;
 }
@@ -350,135 +404,203 @@
     pointer-events: auto !important;
 }
 
-/* Material Design notification styles */
+
+/* ==========================================
+   NOTIFICATIONS - Glassmorphism cards
+   ========================================== */
+
 .notification {
-    padding: 16px 24px !important;
-    border-radius: var(--md-border-radius-medium) !important;
+    padding: 14px 20px !important;
+    border-radius: 12px !important;
     color: var(--md-surface-50) !important;
     font-family: var(--md-font-family) !important;
-    font-size: 14px !important;
+    font-size: 13px !important;
     font-weight: var(--md-font-weight-regular) !important;
-    box-shadow: var(--md-shadow-4) !important;
-    animation: md-fadein var(--md-transition-duration-long) var(--md-transition-easing-decelerate) !important;
-    letter-spacing: 0.25px !important;
-    backdrop-filter: blur(8px) !important;
-    -webkit-backdrop-filter: blur(8px) !important;
+    box-shadow:
+        0 8px 24px rgba(0, 0, 0, 0.2),
+        0 2px 6px rgba(0, 0, 0, 0.1) !important;
+    animation: immTransl-slideUp 400ms cubic-bezier(0.16, 1, 0.3, 1) !important;
+    letter-spacing: 0.2px !important;
+    backdrop-filter: blur(16px) !important;
+    -webkit-backdrop-filter: blur(16px) !important;
     word-wrap: break-word !important;
     overflow-wrap: break-word !important;
-    line-height: 1.4 !important;
+    line-height: 1.45 !important;
     max-width: 100% !important;
-}
-
-/* Mobile optimizations for notifications */
-@media (max-width: 768px) {
-    .notification {
-        padding: 14px 20px !important;
-        font-size: 13px !important;
-        border-radius: var(--md-border-radius-small) !important;
-        line-height: 1.3 !important;
-    }
-}
-
-@media (max-width: 480px) {
-    .notification {
-        padding: 12px 16px !important;
-        font-size: 12px !important;
-        line-height: 1.25 !important;
-    }
+    border: 1px solid rgba(255, 255, 255, 0.06) !important;
 }
 
 .notification.error {
-    background-color: var(--md-error-500) !important;
+    background: rgba(220, 38, 38, 0.88) !important;
     color: var(--md-surface-50) !important;
 }
 
 .notification.warning {
-    background-color: var(--md-warning-500) !important;
-    color: var(--md-surface-900) !important;
+    background: rgba(217, 119, 6, 0.88) !important;
+    color: var(--md-surface-50) !important;
     font-weight: var(--md-font-weight-medium) !important;
 }
 
 .notification.success {
-    background-color: var(--md-success-500) !important;
+    background: rgba(21, 128, 61, 0.88) !important;
     color: var(--md-surface-50) !important;
 }
 
 .notification.info {
-    background-color: var(--md-primary-500) !important;
+    background: rgba(45, 133, 181, 0.88) !important;
     color: var(--md-surface-50) !important;
 }
 
 .fade-out {
-    animation: md-fadeout var(--md-transition-duration-medium) var(--md-transition-easing-accelerate) forwards !important;
+    animation: immTransl-fadeOut 250ms cubic-bezier(0.4, 0, 1, 1) forwards !important;
 }
 
-/* Material Design control buttons container */
+
+/* ==========================================
+   ADAPTIVE LIGHT THEME
+   (applied when page background is dark)
+   ========================================== */
+
+#immersiveTranslatorUI.immTransl-light #translationFeedbackBox {
+    background: rgba(255, 255, 255, 0.9) !important;
+    color: rgba(0, 0, 0, 0.82) !important;
+    border-color: rgba(0, 0, 0, 0.07) !important;
+    box-shadow:
+        0 8px 32px rgba(0, 0, 0, 0.1),
+        0 2px 8px rgba(0, 0, 0, 0.06),
+        inset 0 1px 0 rgba(255, 255, 255, 0.6) !important;
+}
+
+#immersiveTranslatorUI.immTransl-light #translationFeedbackBox::before {
+    background: linear-gradient(90deg,
+        var(--md-primary-500),
+        var(--md-primary-400),
+        var(--md-primary-600)) !important;
+    opacity: 0.85 !important;
+}
+
+#immersiveTranslatorUI.immTransl-light .immTransl-arrow {
+    color: rgba(0, 0, 0, 0.35);
+    background: rgba(0, 0, 0, 0.04);
+}
+
+#immersiveTranslatorUI.immTransl-light .immTransl-arrow:hover {
+    background: rgba(0, 0, 0, 0.08);
+    color: rgba(0, 0, 0, 0.65);
+}
+
+#immersiveTranslatorUI.immTransl-light .immTransl-arrow:active {
+    background: rgba(0, 0, 0, 0.12);
+}
+
+#immersiveTranslatorUI.immTransl-light .immTransl-arrow svg g {
+    fill: currentColor !important;
+}
+
+#immersiveTranslatorUI.immTransl-light #translationFeedbackBox .spinner {
+    border-color: rgba(58, 174, 205, 0.25) !important;
+    border-top-color: var(--md-primary-600) !important;
+}
+
+#immersiveTranslatorUI.immTransl-light #feedbackText {
+    color: rgba(0, 0, 0, 0.7) !important;
+}
+
+#immersiveTranslatorUI.immTransl-light #translationControls {
+    border-left-color: rgba(0, 0, 0, 0.08) !important;
+}
+
+#immersiveTranslatorUI.immTransl-light .immTransl-control-btn.pause {
+    background: rgba(245, 158, 11, 0.1) !important;
+    color: #b45309 !important;
+}
+
+#immersiveTranslatorUI.immTransl-light .immTransl-control-btn.pause:hover {
+    background: rgba(245, 158, 11, 0.18) !important;
+}
+
+#immersiveTranslatorUI.immTransl-light .immTransl-control-btn.resume {
+    background: rgba(34, 197, 94, 0.1) !important;
+    color: #15803d !important;
+}
+
+#immersiveTranslatorUI.immTransl-light .immTransl-control-btn.resume:hover {
+    background: rgba(34, 197, 94, 0.18) !important;
+}
+
+#immersiveTranslatorUI.immTransl-light .immTransl-control-btn.cancel {
+    background: rgba(239, 68, 68, 0.1) !important;
+    color: #dc2626 !important;
+}
+
+#immersiveTranslatorUI.immTransl-light .immTransl-control-btn.cancel:hover {
+    background: rgba(239, 68, 68, 0.18) !important;
+}
+
+#immersiveTranslatorUI.immTransl-light .immTransl-control-btn.pause svg g,
+#immersiveTranslatorUI.immTransl-light .immTransl-control-btn.resume svg g,
+#immersiveTranslatorUI.immTransl-light .immTransl-control-btn.cancel svg g {
+    fill: currentColor !important;
+}
+
+#immersiveTranslatorUI.immTransl-light .notification {
+    border-color: rgba(0, 0, 0, 0.06) !important;
+}
+
+
+/* ==========================================
+   TRANSLATION CONTROLS - Button group
+   ========================================== */
+
 #translationControls {
-    margin-left: 16px !important;
+    margin-left: 12px !important;
     display: flex !important;
-    gap: 8px !important;
+    gap: 6px !important;
     align-items: center !important;
     flex-shrink: 0 !important;
+    padding-left: 12px !important;
+    border-left: 1px solid rgba(255, 255, 255, 0.08) !important;
+    max-width: 300px !important;
+    /* overflow: hidden !important; */
+    transition: max-width 350ms cubic-bezier(0.16, 1, 0.3, 1),
+                opacity 250ms ease,
+                margin 300ms ease,
+                padding 300ms ease,
+                border-color 300ms ease !important;
 }
 
-/* Mobile optimizations for controls container */
-@media (max-width: 768px) {
-    #translationControls {
-        margin-left: 12px !important;
-        gap: 6px !important;
-    }
-}
 
-@media (max-width: 480px) {
-    #translationControls {
-        margin-left: 8px !important;
-        gap: 4px !important;
-    }
-}
+/* ==========================================
+   CONTROL BUTTONS - Refined translucent
+   ========================================== */
 
 .immTransl-control-btn {
-    width: 40px !important;
-    height: 40px !important;
+    width: 34px !important;
+    height: 34px !important;
     border: none !important;
-    border-radius: 50% !important;
+    border-radius: 10px !important;
     cursor: pointer !important;
     outline: none !important;
     display: flex !important;
     align-items: center !important;
     justify-content: center !important;
     color: var(--md-surface-50) !important;
-    font-size: 16px !important;
+    font-size: 14px !important;
     font-family: var(--md-font-family) !important;
     font-weight: var(--md-font-weight-medium) !important;
-    transition: all var(--md-transition-duration-short) var(--md-transition-easing-standard) !important;
-    box-shadow: var(--md-shadow-2) !important;
+    transition: all 200ms cubic-bezier(0.16, 1, 0.3, 1) !important;
+    box-shadow: none !important;
     position: relative !important;
     overflow: hidden !important;
     touch-action: manipulation !important;
-    min-width: 44px !important;
-    min-height: 44px !important;
+    min-width: 34px !important;
+    min-height: 34px !important;
     flex-shrink: 0 !important;
 }
 
-/* Mobile optimizations for control buttons */
-@media (max-width: 768px) {
-    .immTransl-control-btn {
-        width: 38px !important;
-        height: 38px !important;
-        font-size: 15px !important;
-        min-width: 44px !important;
-        min-height: 44px !important;
-    }
-}
-
-@media (max-width: 480px) {
-    .immTransl-control-btn {
-        width: 36px !important;
-        height: 36px !important;
-        font-size: 14px !important;
-        min-width: 44px !important;
-        min-height: 44px !important;
-    }
+.immTransl-control-btn svg {
+    width: 10px !important;
+    height: 10px !important;
 }
 
 .immTransl-control-btn::before {
@@ -490,80 +612,106 @@
     bottom: 0;
     background: currentColor;
     opacity: 0;
-    transition: opacity var(--md-transition-duration-short) var(--md-transition-easing-standard);
+    transition: opacity 150ms ease;
     border-radius: inherit;
 }
 
-.immTransl-control-btn:hover::before {
-    opacity: 0.08;
+.immTransl-control-btn:hover {
+    transform: scale(1.08) !important;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25) !important;
 }
 
-.immTransl-control-btn:focus::before {
-    opacity: 0.12;
+.immTransl-control-btn:hover::before {
+    opacity: 0.1;
 }
 
 .immTransl-control-btn:active {
-    transform: scale(0.96) !important;
-    box-shadow: var(--md-shadow-1) !important;
+    transform: scale(0.95) !important;
+    box-shadow: none !important;
 }
 
 .immTransl-control-btn:active::before {
-    opacity: 0.16;
+    opacity: 0.15;
 }
 
+/* Pause - translucent amber */
 .immTransl-control-btn.pause {
-    background-color: var(--md-warning-500) !important;
-    color: var(--md-surface-900) !important;
+    background: rgba(245, 158, 11, 0.18) !important;
+    color: #fbbf24 !important;
 }
 
+.immTransl-control-btn.pause:hover {
+    background: rgba(245, 158, 11, 0.3) !important;
+}
+
+/* Resume - translucent green */
 .immTransl-control-btn.resume {
-    background-color: var(--md-success-500) !important;
-    color: var(--md-surface-50) !important;
+    background: rgba(34, 197, 94, 0.18) !important;
+    color: #4ade80 !important;
 }
 
+.immTransl-control-btn.resume:hover {
+    background: rgba(34, 197, 94, 0.3) !important;
+}
+
+/* Cancel - translucent red */
 .immTransl-control-btn.cancel {
-    background-color: var(--md-error-500) !important;
-    color: var(--md-surface-50) !important;
+    background: rgba(239, 68, 68, 0.18) !important;
+    color: #f87171 !important;
 }
 
+.immTransl-control-btn.cancel:hover {
+    background: rgba(239, 68, 68, 0.3) !important;
+}
+
+/* Reset - Gradient FAB */
 .immTransl-control-btn.reset {
-    background-color: var(--md-primary-500) !important;
+    background: linear-gradient(135deg, var(--md-primary-400), var(--md-primary-600)) !important;
     color: var(--md-surface-50) !important;
-    width: 48px !important;
-    height: 48px !important;
-    box-shadow: var(--md-shadow-4) !important;
-    min-width: 48px !important;
-    min-height: 48px !important;
+    width: 44px !important;
+    height: 44px !important;
+    min-width: 44px !important;
+    min-height: 44px !important;
+    border-radius: 13px !important;
+    box-shadow:
+        0 4px 16px rgba(118, 200, 219, 0.25),
+        0 2px 6px rgba(0, 0, 0, 0.15) !important;
+    transition: all 300ms cubic-bezier(0.16, 1, 0.3, 1) !important;
 }
 
-/* Mobile optimizations for reset button */
-@media (max-width: 768px) {
-    .immTransl-control-btn.reset {
-        width: 46px !important;
-        height: 46px !important;
-        min-width: 48px !important;
-        min-height: 48px !important;
-    }
+.immTransl-control-btn.reset svg {
+    width: 18px !important;
+    height: 18px !important;
 }
 
-@media (max-width: 480px) {
-    .immTransl-control-btn.reset {
-        width: 44px !important;
-        height: 44px !important;
-        min-width: 48px !important;
-        min-height: 48px !important;
-    }
+.immTransl-control-btn.reset:hover {
+    box-shadow:
+        0 6px 24px rgba(118, 200, 219, 0.35),
+        0 2px 8px rgba(0, 0, 0, 0.2) !important;
+    transform: scale(1.06) !important;
 }
 
+/* Disabled state */
 .immTransl-control-btn:disabled {
-    opacity: 0.38 !important;
+    opacity: 0.3 !important;
     cursor: not-allowed !important;
+    box-shadow: none !important;
+    transform: none !important;
+}
+
+.immTransl-control-btn:disabled:hover {
+    transform: none !important;
     box-shadow: none !important;
 }
 
 .immTransl-control-btn:disabled::before {
     display: none;
 }
+
+
+/* ==========================================
+   INLINE TRANSLATION ELEMENTS
+   ========================================== */
 
 .translation-wrapper {
     position: relative;
@@ -581,25 +729,6 @@
     animation: spin 1s linear infinite;
     margin-left: 8px;
     flex: 0 0 auto;
-}
-
-/* Mobile optimizations for text spinner */
-@media (max-width: 768px) {
-    .text-spinner {
-        width: 15px;
-        height: 15px;
-        margin-left: 6px;
-        border-width: 1.5px;
-    }
-}
-
-@media (max-width: 480px) {
-    .text-spinner {
-        width: 14px;
-        height: 14px;
-        margin-left: 5px;
-        border-width: 1.5px;
-    }
 }
 
 .text-retry-button {
@@ -621,33 +750,11 @@
     box-shadow: var(--md-shadow-2);
     transition: all var(--md-transition-duration-short) var(--md-transition-easing-standard);
     position: relative;
-    cursor: pointer;
     z-index: 1000;
     overflow: hidden;
     touch-action: manipulation;
     min-width: 28px;
     min-height: 28px;
-}
-
-/* Mobile optimizations for text retry button */
-@media (max-width: 768px) {
-    .text-retry-button {
-        width: 24px;
-        height: 24px;
-        min-width: 32px;
-        min-height: 32px;
-        padding: 4px;
-    }
-}
-
-@media (max-width: 480px) {
-    .text-retry-button {
-        width: 22px;
-        height: 22px;
-        min-width: 30px;
-        min-height: 30px;
-        padding: 4px;
-    }
 }
 
 .text-retry-button::before {
@@ -691,9 +798,103 @@
     z-index: 9999;
 }
 
-/* Mobile Touch Optimizations */
+
+/* ==========================================
+   MOBILE RESPONSIVE - 768px
+   ========================================== */
+
 @media (max-width: 768px) {
-    /* Ensure proper touch targets */
+    #immersiveTranslatorUI {
+        bottom: 16px !important;
+        right: 16px !important;
+    }
+
+    #translationContainer {
+        gap: 8px !important;
+        max-width: calc(100vw - 32px) !important;
+    }
+
+    #translationFeedbackBox {
+        padding: 11px 14px !important;
+        font-size: 13px !important;
+        border-radius: 12px !important;
+        min-height: 44px !important;
+        max-width: calc(100vw - 100px) !important;
+    }
+
+    #translationFeedbackBox::before {
+        left: 12px !important;
+        right: 12px !important;
+    }
+
+    .immTransl-arrow {
+        min-width: 40px;
+        min-height: 40px;
+        padding: 11px;
+        margin-right: 8px;
+    }
+
+    #translationFeedbackBox .spinner {
+        width: 16px !important;
+        height: 16px !important;
+        margin-right: 10px !important;
+    }
+
+    #feedbackText {
+        font-size: 13px !important;
+        max-width: 300px !important;
+    }
+
+    #translationControls {
+        margin-left: 10px !important;
+        padding-left: 10px !important;
+        gap: 5px !important;
+    }
+
+    /* Minimized pill on tablet */
+    #translationContainer.hidden #translationFeedbackBox {
+        padding: 5px 8px !important;
+        min-height: 34px !important;
+    }
+
+    .immTransl-control-btn {
+        min-width: 40px !important;
+        min-height: 40px !important;
+    }
+
+    .immTransl-control-btn.reset {
+        width: 42px !important;
+        height: 42px !important;
+        min-width: 44px !important;
+        min-height: 44px !important;
+    }
+
+    #notificationContainer {
+        max-width: calc(100vw - 32px) !important;
+    }
+
+    .notification {
+        padding: 12px 16px !important;
+        font-size: 12.5px !important;
+        border-radius: 10px !important;
+    }
+
+    .text-spinner {
+        width: 15px;
+        height: 15px;
+        margin-left: 6px;
+        border-width: 1.5px;
+    }
+
+    .text-retry-button {
+        width: 24px;
+        height: 24px;
+        min-width: 32px;
+        min-height: 32px;
+        padding: 4px;
+    }
+
+    /* Touch targets (exclude minimized-state controls) */
     button,
     .immTransl-control-btn,
     .immTransl-arrow,
@@ -701,49 +902,23 @@
         min-width: 44px !important;
         min-height: 44px !important;
     }
-    
-    /* Improve text readability */
+
+    #translationContainer.hidden .immTransl-control-btn:not(.reset),
+    #translationContainer.hidden #resetButton {
+        min-width: 0 !important;
+        min-height: 0 !important;
+    }
+
     #translationFeedbackBox,
     .notification {
         -webkit-text-size-adjust: 100%;
         text-size-adjust: 100%;
     }
-    
-    /* Better spacing for small screens */
+
     #translationContainer {
         padding: 0 !important;
     }
-}
 
-@media (max-width: 480px) {
-    /* Ultra-compact mode for very small screens */
-    #translationFeedbackBox {
-        min-width: 200px !important;
-    }
-    
-    .notification {
-        min-width: 180px !important;
-    }
-    
-    /* Ensure touch targets remain accessible */
-    button,
-    .immTransl-control-btn,
-    .immTransl-arrow,
-    .text-retry-button {
-        min-width: 40px !important;
-        min-height: 40px !important;
-    }
-}
-
-/* Landscape mode optimizations */
-@media (max-width: 768px) and (orientation: landscape) {
-    #immersiveTranslatorUI {
-        bottom: 8px !important;
-    }
-}
-
-/* Prevent zoom on input focus for iOS */
-@media (max-width: 768px) {
     input[type="text"],
     input[type="number"],
     input[type="email"],
@@ -751,6 +926,222 @@
     textarea {
         font-size: 16px !important;
     }
+}
+
+
+/* ==========================================
+   MOBILE RESPONSIVE - 480px (compact)
+   ========================================== */
+
+@media (max-width: 480px) {
+    #immersiveTranslatorUI {
+        bottom: 12px !important;
+        right: 12px !important;
+    }
+
+    #translationContainer {
+        gap: 6px !important;
+        max-width: calc(100vw - 24px) !important;
+    }
+
+    #translationFeedbackBox {
+        padding: 10px 12px !important;
+        font-size: 12.5px !important;
+        border-radius: 10px !important;
+        min-height: 42px !important;
+        max-width: calc(100vw - 80px) !important;
+    }
+
+    .immTransl-arrow {
+        min-width: 38px;
+        min-height: 38px;
+        padding: 10px;
+        margin-right: 6px;
+    }
+
+    #translationFeedbackBox .spinner {
+        width: 14px !important;
+        height: 14px !important;
+        margin-right: 8px !important;
+        border-width: 2px !important;
+    }
+
+    #feedbackText {
+        font-size: 12px !important;
+        max-width: 200px !important;
+    }
+
+    #translationControls {
+        margin-left: 8px !important;
+        padding-left: 8px !important;
+        gap: 4px !important;
+    }
+
+    /* Minimized pill on mobile */
+    #translationContainer.hidden #translationFeedbackBox {
+        padding: 4px 7px !important;
+        min-height: 32px !important;
+    }
+
+    .immTransl-control-btn {
+        width: 30px !important;
+        height: 30px !important;
+        min-width: 38px !important;
+        min-height: 38px !important;
+        border-radius: 8px !important;
+    }
+
+    .immTransl-control-btn.reset {
+        width: 40px !important;
+        height: 40px !important;
+        min-width: 44px !important;
+        min-height: 44px !important;
+        border-radius: 11px !important;
+    }
+
+    #notificationContainer {
+        max-width: calc(100vw - 24px) !important;
+    }
+
+    .notification {
+        padding: 10px 14px !important;
+        font-size: 12px !important;
+        border-radius: 8px !important;
+        min-width: 160px !important;
+    }
+
+    .text-spinner {
+        width: 14px;
+        height: 14px;
+        margin-left: 5px;
+        border-width: 1.5px;
+    }
+
+    .text-retry-button {
+        width: 22px;
+        height: 22px;
+        min-width: 30px;
+        min-height: 30px;
+        padding: 4px;
+    }
+
+    /* Touch targets (exclude minimized-state controls) */
+    button,
+    .immTransl-control-btn,
+    .immTransl-arrow,
+    .text-retry-button {
+        min-width: 40px !important;
+        min-height: 40px !important;
+    }
+
+    #translationContainer.hidden .immTransl-control-btn:not(.reset),
+    #translationContainer.hidden #resetButton {
+        min-width: 0 !important;
+        min-height: 0 !important;
+    }
+
+    .notification {
+        min-width: 180px !important;
+    }
+}
+
+
+/* ==========================================
+   LANDSCAPE MODE
+   ========================================== */
+
+@media (max-width: 768px) and (orientation: landscape) {
+    #immersiveTranslatorUI {
+        bottom: 8px !important;
+    }
+}
+
+
+/* ==========================================
+   UTILITY CLASSES
+   ========================================== */
+
+/* Offscreen rendering helper */
+.immTransl-offscreen {
+    position: fixed !important;
+    left: -9999px !important;
+    top: -9999px !important;
+    opacity: 0 !important;
+}
+
+/* Spinner hidden state */
+#translationFeedbackBox .spinner.spinner-hidden {
+    display: none !important;
+}
+
+
+/* ==========================================
+   RESIZE HANDLES
+   ========================================== */
+
+.resize-handle {
+    position: absolute;
+    background: transparent;
+}
+
+/* Edge handles */
+.resize-handle.top,
+.resize-handle.bottom {
+    height: 8px;
+    width: 100%;
+    left: 0;
+    cursor: ns-resize;
+}
+
+.resize-handle.top { top: -4px; }
+.resize-handle.bottom { bottom: -4px; }
+
+.resize-handle.left,
+.resize-handle.right {
+    width: 8px;
+    height: 100%;
+    top: 0;
+    cursor: ew-resize;
+}
+
+.resize-handle.left { left: -4px; }
+.resize-handle.right { right: -4px; }
+
+/* Corner handles */
+.resize-handle.top-left,
+.resize-handle.top-right,
+.resize-handle.bottom-right,
+.resize-handle.bottom-left {
+    width: 12px;
+    height: 12px;
+}
+
+.resize-handle.top-left { top: -6px; left: -6px; cursor: nwse-resize; }
+.resize-handle.top-right { top: -6px; right: -6px; cursor: nesw-resize; }
+.resize-handle.bottom-right { bottom: -6px; right: -6px; cursor: nwse-resize; }
+.resize-handle.bottom-left { bottom: -6px; left: -6px; cursor: nesw-resize; }
+
+
+/* ==========================================
+   OCR STYLES
+   ========================================== */
+
+/* Base OCR container */
+.ocr-container {
+    position: relative;
+}
+
+.ocr-container-inline {
+    display: inline-block;
+}
+
+.ocr-container canvas {
+    z-index: 1;
+}
+
+.ocr-placeholder {
+    width: 100%;
+    background: #fafafa;
 }
 
 .ocr-overlay {
@@ -820,15 +1211,14 @@
 .ocr-box.dragging {
     touch-action: none;
     -webkit-touch-callout: none;
-    /* previene menu contestuale su iOS */
     user-select: none;
     -webkit-user-select: none;
+    cursor: move;
 }
 
 #pdf-container.dragging {
     touch-action: none;
     -webkit-touch-callout: none;
-    /* previene menu contestuale su iOS */
     -webkit-user-select: none;
     user-select: none;
 }
@@ -840,6 +1230,7 @@
     border-radius: 8px;
     padding: 0;
     overflow: hidden;
+    cursor: pointer;
 }
 
 .ocr-box.ocr-box-error:hover {
@@ -863,7 +1254,6 @@
     display: flex;
     align-items: center;
     justify-content: center;
-
     width: 100%;
     height: 100%;
     background: #f44336;
@@ -916,6 +1306,11 @@
     position: relative !important;
     display: inline-block !important;
 }
+
+
+/* ==========================================
+   PDF VIEWER
+   ========================================== */
 
 #pdf-viewer {
     position: relative;
@@ -1016,7 +1411,6 @@
     display: none;
 }
 
-
 #pdf-toolbar button i {
     font-size: 20px;
 }
@@ -1073,7 +1467,10 @@
 }
 
 
-/* Material Design Modal Overlay */
+/* ==========================================
+   PDF OPTIONS MODAL
+   ========================================== */
+
 #pdfOptionsOverlay {
     position: fixed;
     top: 0;
@@ -1092,7 +1489,6 @@
     -webkit-backdrop-filter: blur(4px);
 }
 
-/* Material Design Modal Container */
 #pdfOptionsModal {
     background: var(--md-surface-50);
     border-radius: var(--md-border-radius-extra-large);
@@ -1107,7 +1503,6 @@
     animation: md-slide-up var(--md-transition-duration-long) var(--md-transition-easing-decelerate) forwards;
 }
 
-/* Modal Title */
 #pdfOptionsModal h2 {
     margin-top: 0;
     font-size: 24px;
@@ -1118,7 +1513,6 @@
     letter-spacing: 0.15px;
 }
 
-/* Form Elements */
 #pdfOptionsModal form > div {
     margin-bottom: 20px;
 }
@@ -1131,7 +1525,6 @@
     letter-spacing: 0.25px;
 }
 
-/* Material Design Input Fields */
 #pdfOptionsModal input[type="text"],
 #pdfOptionsModal input[type="number"] {
     width: calc(100% - 24px);
@@ -1154,7 +1547,6 @@
     box-shadow: 0 0 0 2px rgba(33, 150, 243, 0.2);
 }
 
-/* Material Design Radio Buttons */
 #pdfOptionsModal input[type="radio"] {
     appearance: none;
     -webkit-appearance: none;
@@ -1184,7 +1576,6 @@
     border-radius: 50%;
 }
 
-/* Material Design Quality Slider Container */
 #pdfOptionsModal .quality-container {
     display: flex;
     align-items: center;
@@ -1215,7 +1606,6 @@
     border-radius: var(--md-border-radius-small);
 }
 
-/* Material Design Slider */
 #pdfOptionsModal input[type="range"] {
     appearance: none;
     -webkit-appearance: none;
@@ -1227,7 +1617,6 @@
     transition: background var(--md-transition-duration-short) var(--md-transition-easing-standard);
 }
 
-/* Slider Track for Webkit */
 #pdfOptionsModal input[type="range"]::-webkit-slider-runnable-track {
     width: 100%;
     height: 4px;
@@ -1236,7 +1625,6 @@
     border-radius: 2px;
 }
 
-/* Slider Thumb for Webkit */
 #pdfOptionsModal input[type="range"]::-webkit-slider-thumb {
     appearance: none;
     -webkit-appearance: none;
@@ -1250,7 +1638,6 @@
     margin-top: -8px;
 }
 
-/* Slider Thumb Hover for Webkit */
 #pdfOptionsModal input[type="range"]::-webkit-slider-thumb:hover {
     background: var(--md-primary-600);
     transform: scale(1.1);
@@ -1273,7 +1660,6 @@
     }
 }
 
-/* Material Design Button Group */
 #pdfOptionsModal .button-group {
     display: flex;
     justify-content: flex-end;
@@ -1350,7 +1736,7 @@
     box-shadow: var(--md-shadow-1);
 }
 
-/* Responsive Design for Mobile - PDF Options Modal */
+/* Responsive - PDF Options Modal */
 @media (max-width: 768px) {
     #pdfOptionsModal {
         padding: 20px;
@@ -1432,8 +1818,7 @@
     }
 }
 
-
-/* Responsive Design for PDF Toolbar */
+/* Responsive - PDF Toolbar */
 @media (max-width: 768px) {
     #pdf-toolbar {
         width: 95%;
