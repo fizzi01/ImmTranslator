@@ -1223,12 +1223,164 @@
             throw new Error("Metodo terminateEngine() non implementato in OCREngine");
         }
     }
+    function createTesseractMainThreadShim(blobUrl, blob) {
+        console.warn("Tesseract: CSP blocked Worker, using main-thread shim");
+        const channel = new MessageChannel();
+        const workerPort = channel.port1, callerPort = channel.port2;
+        const pendingMessages = [];
+        let ready = false;
+        const fakeBase = {
+            onmessage: null,
+            _msgListeners: [],
+            postMessage: function(data, transfer) { workerPort.postMessage(data, transfer || []); },
+            addEventListener: function(type, fn) {
+                if (type === "message") fakeBase._msgListeners.push(fn);
+            },
+            removeEventListener: function(type, fn) {
+                if (type === "message") fakeBase._msgListeners = fakeBase._msgListeners.filter(function(f) { return f !== fn; });
+            }
+        };
+        var fakeSelf = typeof Proxy !== "undefined" ? new Proxy(fakeBase, {
+            get: function(t, p) { if (p === "self") return fakeSelf; return p in t ? t[p] : window[p]; },
+            set: function(t, p, v) { t[p] = v; return true; }
+        }) : fakeBase;
+        if (!("Proxy" in window)) fakeBase.self = fakeBase;
+        function shimAddEventListener(type, fn) {
+            if (type === "message") fakeBase._msgListeners.push(fn);
+        }
+        function shimRemoveEventListener(type, fn) {
+            if (type === "message") fakeBase._msgListeners = fakeBase._msgListeners.filter(function(f) { return f !== fn; });
+        }
+        var _importCache = {};
+        function shimImportScripts() {
+            for (var i = 0; i < arguments.length; i++) {
+                try {
+                    var url = arguments[i];
+                    var code = _importCache[url];
+                    if (!code) {
+                        console.warn("[TessShim] importScripts sync XHR fallback:", url);
+                        var xhr = new XMLHttpRequest();
+                        xhr.open("GET", url, false);
+                        xhr.send();
+                        if (xhr.status >= 200 && xhr.status < 300) code = xhr.responseText;
+                    }
+                    if (code) (0, eval)(code);
+                } catch(ex) { console.warn("shimImportScripts failed for:", arguments[i], ex); }
+            }
+        }
+        function dispatchToFake(e) {
+            if (typeof fakeSelf.onmessage === "function") fakeSelf.onmessage(e);
+            fakeBase._msgListeners.forEach(function(fn) { fn(e); });
+        }
+        workerPort.onmessage = function(e) {
+            if (!ready) { pendingMessages.push(e); return; }
+            setTimeout(function() { dispatchToFake(e); }, 0);
+        };
+        workerPort.start(); callerPort.start();
+        (async function() {
+            try {
+                var blobText = blob ? await blob.text() : await fetch(blobUrl).then(function(r) { return r.text(); });
+                var match = blobText.match(/importScripts\s*\(\s*["'](.+?)["']\s*\)/);
+                var workerCode;
+                if (match) {
+                    var resp = await fetch(match[1]);
+                    workerCode = await resp.text();
+                } else {
+                    workerCode = blobText;
+                }
+                // Pre-fetch WASM core JS files asynchronously so shimImportScripts serves from cache
+                var coreUrls = workerCode.match(/https?:\/\/[^"'\s\\)]+tesseract-core[^"'\s\\)]*\.js/g) || [];
+                coreUrls = coreUrls.filter(function(v, i, a) { return a.indexOf(v) === i; });
+                for (var u = 0; u < coreUrls.length; u++) {
+                    try {
+                        var pResp = await fetch(coreUrls[u]);
+                        if (pResp.ok) _importCache[coreUrls[u]] = await pResp.text();
+                    } catch(e) {}
+                }
+                await new Promise(function(r) { setTimeout(r, 0); });
+                var fn = new Function("self", "postMessage", "importScripts", "addEventListener", "removeEventListener", "onmessage", workerCode);
+                var _savedOm = window.onmessage;
+                var _origWinAEL = window.addEventListener;
+                var _origWinREL = window.removeEventListener;
+                window.addEventListener = function(type, fn, opts) {
+                    if (type === "message") { fakeBase._msgListeners.push(fn); return; }
+                    _origWinAEL.call(window, type, fn, opts);
+                };
+                window.removeEventListener = function(type, fn, opts) {
+                    if (type === "message") { fakeBase._msgListeners = fakeBase._msgListeners.filter(function(f) { return f !== fn; }); return; }
+                    _origWinREL.call(window, type, fn, opts);
+                };
+                window.importScripts = shimImportScripts;
+                fn(fakeSelf, fakeSelf.postMessage.bind(fakeSelf), shimImportScripts, shimAddEventListener, shimRemoveEventListener, null);
+                window.addEventListener = _origWinAEL;
+                window.removeEventListener = _origWinREL;
+                if (typeof window.onmessage === "function" && window.onmessage !== _savedOm) {
+                    fakeBase.onmessage = window.onmessage;
+                    window.onmessage = _savedOm;
+                }
+                ready = true;
+                // Flush pending messages with yield between each to avoid blocking the page
+                while (pendingMessages.length) {
+                    await new Promise(function(r) { setTimeout(r, 0); });
+                    if (pendingMessages.length) dispatchToFake(pendingMessages.shift());
+                }
+            } catch(err) {
+                console.error("Tesseract main-thread shim error:", err);
+            }
+        })();
+        var shim = {
+            postMessage: function(data, transfer) { callerPort.postMessage(data, transfer || []); },
+            addEventListener: function(type, fn) {
+                if (type === "message") callerPort.addEventListener("message", fn);
+                if (type === "error") callerPort.addEventListener("error", fn);
+            },
+            removeEventListener: function(type, fn) {
+                if (type === "message") callerPort.removeEventListener("message", fn);
+                if (type === "error") callerPort.removeEventListener("error", fn);
+            },
+            terminate: function() { workerPort.close(); callerPort.close(); }
+        };
+        Object.defineProperty(shim, "onmessage", {
+            get: function() { return callerPort.onmessage; },
+            set: function(fn) { callerPort.onmessage = fn; }
+        });
+        Object.defineProperty(shim, "onerror", {
+            get: function() { return callerPort.onerror; },
+            set: function(fn) { callerPort.onerror = fn; }
+        });
+        return shim;
+    }
     class TesseractAdapter extends OCREngine {
         constructor(languages = "eng", tesseractOptions = null) {
-            super(), this.worker = null, this.languages = languages, this.tesseractOptions = tesseractOptions;
+            super(), this.worker = null, this.languages = languages, this.tesseractOptions = tesseractOptions, this.isMainThreadShim = false;
         }
         async initEngine() {
-            this.worker = await Tesseract.createWorker(this.languages), this.tesseractOptions && await this.worker.setParameters(this.tesseractOptions);
+            try {
+                this.worker = await Promise.race([
+                    Tesseract.createWorker(this.languages),
+                    new Promise(function(_, reject) { setTimeout(function() { reject(new Error("Worker CSP timeout")); }, 3000); })
+                ]);
+            } catch(e) {
+                console.warn("Tesseract Worker creation failed, retrying with main-thread shim:", e && e.message || e);
+                this.isMainThreadShim = true;
+                const OrigWorker = window.Worker;
+                const OrigCreateObjectURL = URL.createObjectURL;
+                const blobMap = new Map();
+                URL.createObjectURL = function(obj) {
+                    var url = OrigCreateObjectURL.call(URL, obj);
+                    if (obj instanceof Blob) blobMap.set(url, obj);
+                    return url;
+                };
+                window.Worker = function(url) { return createTesseractMainThreadShim(url, blobMap.get(url)); };
+                window.Worker.prototype = OrigWorker.prototype;
+                try {
+                    this.worker = await Tesseract.createWorker(this.languages);
+                } finally {
+                    window.Worker = OrigWorker;
+                    URL.createObjectURL = OrigCreateObjectURL;
+                }
+            }
+            this.tesseractOptions && await this.worker.setParameters(this.tesseractOptions);
         }
         async terminateEngine() {
             this.worker && (await this.worker.terminate(), this.worker = null);
@@ -2384,7 +2536,39 @@
             try {
                 this.uiManager.initUI();
                 const images = document.querySelectorAll("img"), total = images.length;
-                await this.ocrManager.getOcrEngine().initEngine();
+                const ocrEngine = this.ocrManager.getOcrEngine();
+                await ocrEngine.initEngine();
+                const isShim = ocrEngine.isMainThreadShim;
+                if (isShim) {
+                    let processed = 0;
+                    const toProcess = Array.from(images).filter(img => "true" !== img.dataset.ocrProcessed);
+                    const totalToProcess = toProcess.length;
+                    if (totalToProcess > 0) {
+                        BaseUIManager.showNotification(
+                            `Running in compatibility mode (${totalToProcess} image${totalToProcess > 1 ? "s" : ""}). The page may be slow while processing.`,
+                            "warning", 1e4
+                        );
+                    }
+                    this.uiManager.updateFeedback(`Image (0/${totalToProcess})`, !0);
+                    for (let i = 0; i < toProcess.length; i++) {
+                        if (ImmUtils.isCancelled()) {
+                            await ocrEngine.terminateEngine();
+                            throw new Error("Operation cancelled.");
+                        }
+                        await ImmUtils.checkPaused();
+                        try {
+                            await this.ocrManager.processContent(toProcess[i]);
+                            processed++;
+                        } catch (error) {
+                            await ImmUtils.checkPaused();
+                        }
+                        this.uiManager.updateFeedback(`Image (${processed}/${totalToProcess})`);
+                        // Yield to the main thread between images so the browser can repaint and handle user input
+                        await new Promise(resolve => setTimeout(resolve, 0));
+                    }
+                    await ocrEngine.terminateEngine();
+                    return 0;
+                }
                 const promises = [];
                 let processed = 0;
                 return images.forEach((img, index) => {
@@ -2392,11 +2576,11 @@
                         processed++, this.uiManager.updateFeedback(`Image (${processed}/${total})`);
                     }).catch(async error => (await ImmUtils.checkPaused(), Promise.resolve())))(), new Promise((_, reject) => {
                         const intervalId = setInterval(async () => {
-                            ImmUtils.isCancelled() && (clearInterval(intervalId), await this.ocrManager.getOcrEngine().terminateEngine(), 
+                            ImmUtils.isCancelled() && (clearInterval(intervalId), await ocrEngine.terminateEngine(),
                             reject(new Error("Operation cancelled.")));
                         }, 50);
                     }) ]));
-                }), await Promise.all(promises), await this.ocrManager.getOcrEngine().terminateEngine(), 
+                }), await Promise.all(promises), await ocrEngine.terminateEngine(),
                 0;
             } catch (e) {
                 return BaseUIManager.showNotification(`${e}`, "error"), 1;
