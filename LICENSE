@@ -1,29 +1,21 @@
-Copyright 2025 Federico Izzi. All rights reserved.
+MIT License
 
-This source code and all its components are the exclusive property of Federico Izzi and are protected by copyright laws and international treaties. The code is provided “as-is” and may not be used, copied, modified, distributed, sublicensed, decompiled, or reverse-engineered, in whole or in part, except as expressly permitted in writing by the copyright holder.
+Copyright (c) 2026 Federico Izzi
 
-1. Prohibited Uses
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
 
-Without the prior written consent of Federico Izzi, you may not:
-	-	Reproduce, copy, or distribute the code or any of its parts, whether in original form or modified.
-	-	Reverse-engineer, decompile, or disassemble the code.
-	-	Use the code in any manner that could potentially violate copyright laws or intellectual property rights.
-	-	Sell, sublicense, or redistribute the code for commercial purposes.
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
 
-2. Permitted Use
-
-You are allowed to:
-	-	View the code and use it for educational or non-commercial purposes, provided that the original copyright notice and this license are maintained.
-	-	Fork, clone, or modify the code strictly for personal use, without distributing it.
-
-3. No License to Exploit
-
-Nothing in this agreement grants you the right to use or license the code for any commercial or public purposes, whether directly or indirectly, without a separate agreement signed by Federico Izzi.
-
-4. Contributions
-
-If you submit any contributions to this repository, you agree that your contributions will be subject to this license unless otherwise explicitly agreed upon in writing. By contributing, you waive any right to claim royalties or other compensation for your contributions.
-
-5. Violations and Enforcement
-
-Unauthorized use of this code constitutes a violation of copyright law and may result in legal action under applicable laws. Federico Izzi reserves the right to take all necessary actions to protect the intellectual property rights associated with this code.
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
