@@ -2701,18 +2701,7 @@
         }
     }
     async function initConfig(option) {
-        return "Microsoft" === option.translator && "" === option.translatorOptions.apiKey && (option.translatorOptions.apiKey = await async function getAzureAuthKey() {
-            const options = {
-                method: "GET"
-            };
-            try {
-                const response = await fetch("https://edge.microsoft.com/translate/auth", options);
-                if (!response.ok) throw new Error("Couldn't get API key! Status: " + response.status);
-                return await response.text();
-            } catch (err) {
-                throw err;
-            }
-        }()), option;
+        return option;
     }
     class OptionsBuilder {
         constructor() {

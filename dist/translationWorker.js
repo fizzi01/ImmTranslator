@@ -286,15 +286,12 @@
             }
         }
         class MicrosoftTranslator extends BaseTranslator {
+            checkConfig() {}
             async translate(token) {
-                super.checkConfig();
-                const apiKey = this.apiKey, url = `https://api-edge.cognitive.microsofttranslator.com/translate?&to=${this.targetLang}&api-version=3.0`, data = [ {
-                    Text: token
-                } ], options = {
+                const url = `https://edge.microsoft.com/translate/translatetext?from=&to=${this.targetLang}`, data = [ token ], options = {
                     method: "POST",
                     headers: {
-                        "Content-Type": "application/json",
-                        Authorization: `Bearer ${apiKey}`
+                        "Content-Type": "application/json"
                     },
                     body: JSON.stringify(data)
                 }, responseData = await this.fetchClient.doFetch(url, options);
@@ -302,15 +299,11 @@
                 throw new Error("No translation received from Microsoft.");
             }
             async translateBatch(batchPayload) {
-                super.checkConfig();
                 try {
-                    const apiKey = this.apiKey, url = `https://api-edge.cognitive.microsofttranslator.com/translate?&to=${this.targetLang}&api-version=3.0`, data = batchPayload.items.map(item => ({
-                        Text: item.content
-                    })), options = {
+                    const url = `https://edge.microsoft.com/translate/translatetext?from=&to=${this.targetLang}`, data = batchPayload.items.map(item => item.content), options = {
                         method: "POST",
                         headers: {
-                            "Content-Type": "application/json",
-                            Authorization: `Bearer ${apiKey}`
+                            "Content-Type": "application/json"
                         },
                         body: JSON.stringify(data)
                     }, responseData = await this.fetchClient.doFetch(url, options);
